@@ -36,8 +36,28 @@ const Popup = () => {
     keywords: false,
     ai: false,
     filters: false,
+    location: false,
     advanced: true
   });
+
+  // Add these after existing skill states
+  const [primarySkills, setPrimarySkills] = useState("JavaScript, React, Node.js, TypeScript, HTML, CSS, Express.js, frontend, backend");
+  const [secondarySkills, setSecondarySkills] = useState("Laravel, PHP, AWS, Docker, MongoDB, sql, mysql, PostgreSQL, CI/CD, Event-Driven, BullMQ, GitHub Actions, EC2, Git, SQL/NoSQL, FinTech, Unit Testing, Agile, Socket.IO, Microservices, Redis, Serverless, SpringBoot");
+  const [tertiarySkills, setTertiarySkills] = useState("GraphQL");
+  const [skillWeights, setSkillWeights] = useState({
+    primary: 10,
+    secondary: 5,
+    tertiary: 1
+  });
+  const [minSkillScore, setMinSkillScore] = useState(15);
+  // Add this after existing skill states
+  const [minPrimarySkills, setMinPrimarySkills] = useState(3);
+
+  // Add these after existing filter states
+  const [skipLanguageRequirements, setSkipLanguageRequirements] = useState(true);
+  const [remoteOnly, setRemoteOnly] = useState(false);
+  const [localHireOnly, setLocalHireOnly] = useState(false);
+  const [skipVisaSponsorship, setSkipVisaSponsorship] = useState(false);
 
   // Refs for intervals
   const updateIntervalRef = React.useRef(null);
@@ -91,13 +111,25 @@ const Popup = () => {
   }, []);
 
   const getSettings = useCallback(() => {
-    const keywordList = keywords
-      .split(",")
-      .map((k) => k.trim())
-      .filter((k) => k.length > 0);
+    const primaryList = primarySkills.split(",").map((k) => k.trim()).filter((k) => k.length > 0);
+    const secondaryList = secondarySkills.split(",").map((k) => k.trim()).filter((k) => k.length > 0);
+    const tertiaryList = tertiarySkills.split(",").map((k) => k.trim()).filter((k) => k.length > 0);
 
     return {
-      keywords: keywordList,
+      keywords: [...primaryList, ...secondaryList, ...tertiaryList],
+      // New skill-based structure
+      skillLevels: {
+        primary: primaryList,
+        secondary: secondaryList,
+        tertiary: tertiaryList
+      },
+      skillWeights,
+      minSkillScore,
+      minPrimarySkills,
+      skipLanguageRequirements,
+      remoteOnly,
+      localHireOnly,
+      skipVisaSponsorship,
       maxApplicants,
       minApplicants,
       easyApplyOnly,
@@ -115,7 +147,7 @@ const Popup = () => {
       minATSScore: minAtsScore,
       includeKeywordAnalysis,
     };
-  }, [keywords, maxApplicants, minApplicants, easyApplyOnly, externalApplyOnly, englishOnly, matchAnyKeyword, caseSensitive, scrapingDelay, maxPages, autoScroll, skipDuplicates, enableAI, resumeText, openRouterAPIKey, minAtsScore, includeKeywordAnalysis]);
+  }, [keywords, primarySkills, secondarySkills, tertiarySkills, skillWeights, minSkillScore, minPrimarySkills, skipLanguageRequirements, remoteOnly, localHireOnly, skipVisaSponsorship, maxApplicants, minApplicants, easyApplyOnly, externalApplyOnly, englishOnly, matchAnyKeyword, caseSensitive, scrapingDelay, maxPages, autoScroll, skipDuplicates, enableAI, resumeText, openRouterAPIKey, minAtsScore, includeKeywordAnalysis]);
 
   // Save settings to localStorage
   const saveSettings = useCallback(() => {
@@ -128,6 +160,15 @@ const Popup = () => {
     const saved = localStorage.getItem("jobScraperSettings");
     if (saved) {
       const settings = JSON.parse(saved);
+      // Load skill levels
+      if (settings.skillLevels) {
+        setPrimarySkills(settings.skillLevels.primary?.join(", ") || "");
+        setSecondarySkills(settings.skillLevels.secondary?.join(", ") || "");
+        setTertiarySkills(settings.skillLevels.tertiary?.join(", ") || "");
+      }
+      setSkillWeights(settings.skillWeights || { primary: 10, secondary: 5, tertiary: 1 });
+      setMinSkillScore(settings.minSkillScore || 15);
+      setMinPrimarySkills(settings.minPrimarySkills || 3);
       setKeywords(settings.keywords?.join(", ") || keywords);
       setMaxApplicants(settings.maxApplicants || 100);
       setMinApplicants(settings.minApplicants || 0);
@@ -140,6 +181,10 @@ const Popup = () => {
       setMaxPages(settings.maxPages || 10);
       setAutoScroll(settings.autoScroll !== false);
       setSkipDuplicates(settings.skipDuplicates !== false);
+      setSkipLanguageRequirements(settings.skipLanguageRequirements !== false);
+      setRemoteOnly(settings.remoteOnly || false);
+      setLocalHireOnly(settings.localHireOnly || false);
+      setSkipVisaSponsorship(settings.skipVisaSponsorship || false);
     }
     loadAISettings();
   }, [keywords]);
@@ -154,7 +199,7 @@ const Popup = () => {
       setIncludeKeywordAnalysis(settings.includeKeywordAnalysis !== false);
       setEnableAI(settings.enableAI || false);
     }
-    
+
     const apiKey = sessionStorage.getItem("openRouterApiKey");
     if (apiKey) {
       setOpenRouterAPIKey(apiKey);
@@ -174,7 +219,7 @@ const Popup = () => {
       } else {
         setCurrentStatus("Checking connection...");
         const connected = await PopupConnectionManager.ensureConnection(currentTab.id);
-        
+
         if (connected) {
           setCurrentStatus("Ready");
           checkScrapingStatus(currentTab.id);
@@ -198,10 +243,10 @@ const Popup = () => {
       const response = await PopupConnectionManager.sendMessageWithRetry(tabId, {
         type: "getStatus",
       });
-      
+
       setIsActive(response.isActive);
       setJobsFound(response.jobsFound);
-      
+
       if (response.isActive) {
         startPeriodicUpdate();
       }
@@ -247,12 +292,12 @@ const Popup = () => {
         }
       } catch (error) {
         console.log("Periodic update failed:", error.message);
-        
+
         if (updateIntervalRef.current) {
           clearInterval(updateIntervalRef.current);
           updateIntervalRef.current = null;
         }
-        
+
         showMessage("Connection lost. Please refresh the page.", "error");
         setIsActive(false);
       }
@@ -605,53 +650,248 @@ const Popup = () => {
           >
             <span className="flex items-center space-x-2">
               <span>🎯</span>
-              <span>Keywords & Matching</span>
+              <span>Skills & Expertise Levels</span>
             </span>
             <span className={`transform transition-transform ${collapsedSections.keywords ? 'rotate-180' : ''}`}>
               ▼
             </span>
           </button>
-          
+
           {!collapsedSections.keywords && (
-            <div className="p-4 pt-0">
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">
-                  Enter your keywords (comma-separated):
+            <div className="p-4 pt-0 space-y-4">
+              {/* Primary Skills */}
+              <div>
+                <label className="block text-sm font-bold mb-2 text-green-700">
+                  🟢 Primary Skills (Core Expertise) - Weight: {skillWeights.primary}x
                 </label>
                 <textarea
-                  value={keywords}
-                  onChange={(e) => setKeywords(e.target.value)}
-                  rows={3}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="JavaScript, React, Node.js, Python, AWS, Docker, etc."
+                  value={primarySkills}
+                  onChange={(e) => setPrimarySkills(e.target.value)}
+                  rows={2}
+                  className="w-full p-3 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="JavaScript, React, Node.js, TypeScript..."
                 />
+                <div className="flex flex-wrap mt-2">
+                  {primarySkills.split(",").map((skill, index) =>
+                    skill.trim() && (
+                      <span key={index} className="inline-block bg-green-500 text-white px-2 py-1 m-1 rounded-full text-xs">
+                        {skill.trim()}
+                      </span>
+                    )
+                  )}
+                </div>
               </div>
-              
-              <div className="mb-4">
-                {keywordTags.map((keyword, index) => (
-                  <span key={index} className="keyword-tag">{keyword}</span>
-                ))}
+
+              {/* Secondary Skills */}
+              <div>
+                <label className="block text-sm font-bold mb-2 text-blue-700">
+                  🔵 Secondary Skills (Strong Knowledge) - Weight: {skillWeights.secondary}x
+                </label>
+                <textarea
+                  value={secondarySkills}
+                  onChange={(e) => setSecondarySkills(e.target.value)}
+                  rows={2}
+                  className="w-full p-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Python, AWS, Docker, MongoDB..."
+                />
+                <div className="flex flex-wrap mt-2">
+                  {secondarySkills.split(",").map((skill, index) =>
+                    skill.trim() && (
+                      <span key={index} className="inline-block bg-blue-500 text-white px-2 py-1 m-1 rounded-full text-xs">
+                        {skill.trim()}
+                      </span>
+                    )
+                  )}
+                </div>
               </div>
-              
-              <div className="space-y-3">
+
+              {/* Tertiary Skills */}
+              <div>
+                <label className="block text-sm font-bold mb-2 text-orange-700">
+                  🟠 Tertiary Skills (Familiar/Learning) - Weight: {skillWeights.tertiary}x
+                </label>
+                <textarea
+                  value={tertiarySkills}
+                  onChange={(e) => setTertiarySkills(e.target.value)}
+                  rows={2}
+                  className="w-full p-3 border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  placeholder="Java, Kubernetes, GraphQL..."
+                />
+                <div className="flex flex-wrap mt-2">
+                  {tertiarySkills.split(",").map((skill, index) =>
+                    skill.trim() && (
+                      <span key={index} className="inline-block bg-orange-500 text-white px-2 py-1 m-1 rounded-full text-xs">
+                        {skill.trim()}
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+
+              {/* Skill Scoring Settings */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-bold mb-3">📊 Skill Scoring Configuration</h4>
+
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  <label className="text-center">
+                    <span className="block text-xs font-medium text-green-700">Primary Weight</span>
+                    <input
+                      type="number"
+                      value={skillWeights.primary}
+                      onChange={(e) => setSkillWeights(prev => ({ ...prev, primary: parseInt(e.target.value) || 10 }))}
+                      min="1"
+                      max="20"
+                      className="w-full p-2 border border-gray-300 rounded text-center"
+                    />
+                  </label>
+                  <label className="text-center">
+                    <span className="block text-xs font-medium text-blue-700">Secondary Weight</span>
+                    <input
+                      type="number"
+                      value={skillWeights.secondary}
+                      onChange={(e) => setSkillWeights(prev => ({ ...prev, secondary: parseInt(e.target.value) || 5 }))}
+                      min="1"
+                      max="15"
+                      className="w-full p-2 border border-gray-300 rounded text-center"
+                    />
+                  </label>
+                  <label className="text-center">
+                    <span className="block text-xs font-medium text-orange-700">Tertiary Weight</span>
+                    <input
+                      type="number"
+                      value={skillWeights.tertiary}
+                      onChange={(e) => setSkillWeights(prev => ({ ...prev, tertiary: parseInt(e.target.value) || 1 }))}
+                      min="1"
+                      max="10"
+                      className="w-full p-2 border border-gray-300 rounded text-center"
+                    />
+                  </label>
+                </div>
+
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                  <h5 className="font-semibold text-green-800 mb-2">🎯 Primary Skills Requirement</h5>
+                  <label className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-green-700">Minimum Primary Skills Required:</span>
+                    <input
+                      type="number"
+                      value={minPrimarySkills}
+                      onChange={(e) => setMinPrimarySkills(parseInt(e.target.value) || 3)}
+                      min="1"
+                      max="10"
+                      className="w-16 p-2 border border-green-300 rounded bg-white"
+                    />
+                  </label>
+                  <div className="text-xs text-green-600 mt-1">
+                    Jobs must match at least {minPrimarySkills} primary skills to be considered
+                  </div>
+                </div>
+
                 <label className="flex items-center justify-between">
-                  <span>Match any keyword</span>
+                  <span className="text-sm font-medium">Minimum Total Skill Score:</span>
                   <input
-                    type="checkbox"
-                    checked={matchAnyKeyword}
-                    onChange={(e) => setMatchAnyKeyword(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    type="number"
+                    value={minSkillScore}
+                    onChange={(e) => setMinSkillScore(parseInt(e.target.value) || 15)}
+                    min="0"
+                    max="100"
+                    className="w-20 p-2 border border-gray-300 rounded"
                   />
                 </label>
-                <label className="flex items-center justify-between">
-                  <span>Case sensitive matching</span>
+
+                <div className="text-xs text-gray-600 mt-2">
+                  Jobs will be scored: Primary×{skillWeights.primary} + Secondary×{skillWeights.secondary} + Tertiary×{skillWeights.tertiary}
+                  <br />
+                  <strong>Must have ≥{minPrimarySkills} primary skills AND ≥{minSkillScore} total score</strong>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Language & Location Section */}
+        <div className="border-b border-gray-200">
+          <button
+            onClick={() => toggleSection('location')}
+            className="w-full p-4 text-left font-semibold flex items-center justify-between hover:bg-gray-50 transition-colors"
+          >
+            <span className="flex items-center space-x-2">
+              <span>🌍</span>
+              <span>Language & Location Filters</span>
+            </span>
+            <span className={`transform transition-transform ${collapsedSections.location ? 'rotate-180' : ''}`}>
+              ▼
+            </span>
+          </button>
+
+          {!collapsedSections.location && (
+            <div className="p-4 pt-0 space-y-4">
+              {/* Language Requirements */}
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <h5 className="font-semibold text-blue-800 mb-2">🗣️ Language Requirements</h5>
+                <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={caseSensitive}
-                    onChange={(e) => setCaseSensitive(e.target.checked)}
+                    checked={skipLanguageRequirements}
+                    onChange={(e) => setSkipLanguageRequirements(e.target.checked)}
                     className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                   />
+                  <span className="text-sm">Skip jobs requiring additional languages</span>
                 </label>
+                <div className="text-xs text-blue-600 mt-1">
+                  Will skip jobs mentioning: German, French, Spanish, Italian, Dutch, etc.
+                </div>
+              </div>
+
+              {/* Work Location Preferences */}
+              <div className="bg-green-50 p-3 rounded-lg">
+                <h5 className="font-semibold text-green-800 mb-2">📍 Work Location Preferences</h5>
+                <div className="space-y-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={remoteOnly}
+                      onChange={(e) => {
+                        setRemoteOnly(e.target.checked);
+                        if (e.target.checked) setLocalHireOnly(false);
+                      }}
+                      className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                    />
+                    <span className="text-sm">Remote work only</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={localHireOnly}
+                      onChange={(e) => {
+                        setLocalHireOnly(e.target.checked);
+                        if (e.target.checked) setRemoteOnly(false);
+                      }}
+                      className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                    />
+                    <span className="text-sm">Local candidates only</span>
+                  </label>
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  Remote: Looks for "remote", "work from home", "distributed team"<br />
+                  Local: Looks for "local candidates", "on-site", "office-based"
+                </div>
+              </div>
+
+              {/* Visa/Sponsorship */}
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <h5 className="font-semibold text-purple-800 mb-2">🛂 Visa & Sponsorship</h5>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={skipVisaSponsorship}
+                    onChange={(e) => setSkipVisaSponsorship(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <span className="text-sm">Skip jobs requiring visa sponsorship</span>
+                </label>
+                <div className="text-xs text-purple-600 mt-1">
+                  Will skip jobs mentioning visa sponsorship requirements
+                </div>
               </div>
             </div>
           )}
@@ -671,7 +911,7 @@ const Popup = () => {
               ▼
             </span>
           </button>
-          
+
           {!collapsedSections.ai && (
             <div className="p-4 pt-0">
               <label className="flex items-center justify-between mb-4">
@@ -683,7 +923,7 @@ const Popup = () => {
                   className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                 />
               </label>
-              
+
               {enableAI && (
                 <div className="space-y-4">
                   <div>
@@ -696,7 +936,7 @@ const Popup = () => {
                       placeholder="Paste your resume text here..."
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium mb-2">🔑 OpenRouter API Key:</label>
                     <input
@@ -710,7 +950,7 @@ const Popup = () => {
                       Get your API key from <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">openrouter.ai</a>
                     </small>
                   </div>
-                  
+
                   <div className="flex items-center space-x-4">
                     <label className="flex items-center space-x-2">
                       <span>Minimum ATS Score:</span>
@@ -725,7 +965,7 @@ const Popup = () => {
                       <span>%</span>
                     </label>
                   </div>
-                  
+
                   <label className="flex items-center justify-between">
                     <span>Include keyword analysis</span>
                     <input
@@ -735,7 +975,7 @@ const Popup = () => {
                       className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                     />
                   </label>
-                  
+
                   <div className="flex space-x-2">
                     <button
                       onClick={saveAISettings}
@@ -770,7 +1010,7 @@ const Popup = () => {
               ▼
             </span>
           </button>
-          
+
           {!collapsedSections.filters && (
             <div className="p-4 pt-0 space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -797,7 +1037,7 @@ const Popup = () => {
                   />
                 </label>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <label className="flex items-center space-x-2">
                   <input
@@ -818,7 +1058,7 @@ const Popup = () => {
                   <span>External Apply only</span>
                 </label>
               </div>
-              
+
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -846,7 +1086,7 @@ const Popup = () => {
               ▼
             </span>
           </button>
-          
+
           {!collapsedSections.advanced && (
             <div className="p-4 pt-0 space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -873,7 +1113,7 @@ const Popup = () => {
                   />
                 </label>
               </div>
-              
+
               <div className="space-y-3">
                 <label className="flex items-center justify-between">
                   <span>Auto-scroll to load jobs</span>
@@ -904,23 +1144,21 @@ const Popup = () => {
             <button
               onClick={handleStartScraping}
               disabled={isActive || !isLinkedInJobsPage}
-              className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all ${
-                isActive || !isLinkedInJobsPage
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
-              }`}
+              className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all ${isActive || !isLinkedInJobsPage
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                }`}
             >
               🚀 Start Smart Scraping
             </button>
-            
+
             <button
               onClick={handleStopScraping}
               disabled={!isActive}
-              className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all ${
-                !isActive
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
-              }`}
+              className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all ${!isActive
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                }`}
             >
               ⏹️ Stop Scraping
             </button>
@@ -931,22 +1169,20 @@ const Popup = () => {
             <button
               onClick={() => handleDownload('csv')}
               disabled={jobsFound === 0}
-              className={`flex-1 py-2 px-3 rounded-lg font-medium text-white transition-all ${
-                jobsFound === 0
-                  ? 'bg-gray-400 cursor-not-allowed opacity-60'
-                  : 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
-              }`}
+              className={`flex-1 py-2 px-3 rounded-lg font-medium text-white transition-all ${jobsFound === 0
+                ? 'bg-gray-400 cursor-not-allowed opacity-60'
+                : 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
+                }`}
             >
               📥 CSV
             </button>
             <button
               onClick={() => handleDownload('excel')}
               disabled={jobsFound === 0}
-              className={`flex-1 py-2 px-3 rounded-lg font-medium text-white transition-all ${
-                jobsFound === 0
-                  ? 'bg-gray-400 cursor-not-allowed opacity-60'
-                  : 'bg-green-600 hover:bg-green-700 shadow-md hover:shadow-lg'
-              }`}
+              className={`flex-1 py-2 px-3 rounded-lg font-medium text-white transition-all ${jobsFound === 0
+                ? 'bg-gray-400 cursor-not-allowed opacity-60'
+                : 'bg-green-600 hover:bg-green-700 shadow-md hover:shadow-lg'
+                }`}
             >
               📊 Excel
             </button>

@@ -3,7 +3,12 @@ console.log("LinkedIn Job Scraper Pro loaded");
 // Either import it or include it via manifest.json
 
 // Usage example:
-const { matchKeywords, extractMissingSkills } = window.KeywordHelper || {};
+const { matchKeywords, extractMissingSkills, calculateSkillScore } = window.KeywordHelper || {};
+const {
+  hasLanguageRequirements,
+  checkWorkLocationPreference,
+  hasVisaSponsorshipRequirement,
+} = window.LanguageAndLocationHelper || {};
 
 let isScrapingActive = false;
 let allJobData = [];
@@ -46,6 +51,23 @@ let scrapingSettings = {
     "Agile",
     "FinTech",
   ],
+  // Add new skill-based structure
+  skillLevels: {
+    primary: [],
+    secondary: [],
+    tertiary: [],
+  },
+  skillWeights: {
+    primary: 10,
+    secondary: 5,
+    tertiary: 1,
+  },
+  minSkillScore: 15,
+  minPrimarySkills: 3,
+  skipLanguageRequirements: true,
+  remoteOnly: false,
+  localHireOnly: false,
+  skipVisaSponsorship: false,
   maxApplicants: 100,
   minApplicants: 0,
   easyApplyOnly: false,
@@ -187,6 +209,40 @@ function stopJobScraping() {
   });
 }
 
+function getQuickApplicantCount() {
+  const detailsContainer = document.querySelector(
+    ".job-details-jobs-unified-top-card__primary-description-container, " +
+      ".jobs-unified-top-card__primary-description"
+  );
+
+  if (detailsContainer) {
+    const detailsText = detailsContainer.innerText || "";
+    const detailsParts = detailsText.split("·").map((part) => part.trim());
+
+    // Usually applicant count is in the 3rd part after splitting by ·
+    for (const part of detailsParts) {
+      if (part.includes("applicant") || part.includes("application")) {
+        return getApplyCount(part);
+      }
+    }
+  }
+
+  // Fallback: try to find applicant info in other selectors
+  const applicantSelectors = [
+    ".jobs-unified-top-card__subtitle-secondary-grouping",
+    ".job-details-jobs-unified-top-card__primary-description",
+  ];
+
+  for (const selector of applicantSelectors) {
+    const element = document.querySelector(selector);
+    if (element && element.innerText.includes("applicant")) {
+      return getApplyCount(element.innerText);
+    }
+  }
+
+  return 0; // Default if no applicant count found
+}
+
 async function startFetchingJobs() {
   if (!isScrapingActive) return;
   try {
@@ -205,7 +261,30 @@ async function startFetchingJobs() {
       if (jobLink) {
         jobLink.click();
         await waitForJobDescriptionReady();
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // EARLY APPLICANT COUNT CHECK
+        const applicantCount = getQuickApplicantCount();
+        if (
+          applicantCount > scrapingSettings.maxApplicants ||
+          applicantCount < scrapingSettings.minApplicants
+        ) {
+          console.log(
+            `Job skipped: ${applicantCount} applicants (filter: ${scrapingSettings.minApplicants}-${scrapingSettings.maxApplicants})`
+          );
+          card.style.border = "3px solid #FF9800";
+          card.style.backgroundColor = "#fff3e0";
+
+          // Move to next job without further processing
+          if (i < cards.length - 1) {
+            cards[i + 1].scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          continue;
+        }
 
         // ADD ATS processing indicator
         if (scrapingSettings.useATS) {
@@ -227,16 +306,21 @@ async function startFetchingJobs() {
         if (jobData && passesFilters(jobData)) {
           allJobData.push(jobData);
           console.log(
-            `Job saved: ${jobData.title} at ${jobData.company}${
-              jobData.atsScore ? ` (ATS: ${jobData.atsScore}/100)` : ""
-            }`
+            `Job saved: ${jobData.title} at ${jobData.company} ` +
+              `(Primary: ${jobData.primarySkillCount}/${scrapingSettings.minPrimarySkills}, ` +
+              `Score: ${jobData.skillScore}/${scrapingSettings.minSkillScore}${
+                jobData.atsScore ? `, ATS: ${jobData.atsScore}/100` : ""
+              })`
           );
           card.style.border = "3px solid #4CAF50";
           card.style.opacity = "0.7";
         } else {
           const reason = getFilterReason(jobData);
           console.log(
-            `Job filtered: ${jobData?.title || "Unknown"} - Reason: ${reason}`
+            `Job filtered: ${jobData?.title || "Unknown"} - ${reason} ` +
+              `(Primary: ${jobData?.primarySkillCount || 0}, Score: ${
+                jobData?.skillScore || 0
+              })`
           );
           card.style.border = "3px solid #FF9800";
           card.style.backgroundColor = "#fff3e0";
@@ -282,6 +366,20 @@ function passesFilters(jobData) {
     return false;
   if (scrapingSettings.englishOnly && !jobData.isEnglish) return false;
 
+  // NEW: Primary skills requirement (must match at least X primary skills)
+  if (jobData.primarySkillCount < scrapingSettings.minPrimarySkills)
+    return false;
+  // NEW: Skill score filter (replaces simple keyword count check)
+  if (jobData.skillScore < scrapingSettings.minSkillScore) return false;
+
+  // NEW: Work location preference filters
+  if (scrapingSettings.remoteOnly && !jobData.isRemoteFriendly) return false;
+  if (scrapingSettings.localHireOnly && !jobData.isLocalOnly) return false;
+
+  // NEW: Visa sponsorship filter
+  if (scrapingSettings.skipVisaSponsorship && jobData.requiresVisaSponsorship)
+    return false;
+
   // NEW ATS FILTER
   if (scrapingSettings.useATS && jobData.atsScore !== null) {
     if (jobData.atsScore < scrapingSettings.minATSScore) return false;
@@ -307,6 +405,27 @@ function getFilterReason(jobData) {
     return "No keyword matches";
   if (scrapingSettings.englishOnly && !jobData.isEnglish)
     return "Not in English";
+
+  // NEW: Primary skills requirement check
+  if (jobData.primarySkillCount < scrapingSettings.minPrimarySkills)
+    return `Insufficient primary skills (${jobData.primarySkillCount} < ${scrapingSettings.minPrimarySkills} required)`;
+
+  // NEW: Skill score filter reason
+  if (jobData.skillScore < scrapingSettings.minSkillScore)
+    return `Low skill match score (${jobData.skillScore} < ${scrapingSettings.minSkillScore})`;
+
+  // NEW: Language requirements filter reason
+  if (
+    scrapingSettings.skipLanguageRequirements &&
+    jobData.hasLanguageRequirements
+  )
+    return "Requires additional language skills";
+
+  // NEW: Work location preference filter reasons
+  if (scrapingSettings.remoteOnly && !jobData.isRemoteFriendly)
+    return "Not remote-friendly";
+  if (scrapingSettings.localHireOnly && !jobData.isLocalOnly)
+    return "Not local hire only";
 
   // NEW ATS FILTER REASON
   if (
@@ -418,10 +537,23 @@ async function extractJobData(card) {
     const linkedinJobUrl = getCurrentLinkedInJobUrl();
     const { jobType, jobLink } = await determineJobTypeAndLink(linkedinJobUrl);
     const searchText = `${title} ${description}`;
-    const matchedKeywords = window.KeywordHelper.matchKeywords(
+    const matchedKeywords = matchKeywords(
       searchText,
       scrapingSettings.keywords
     );
+
+    // NEW: Skill-based scoring
+    const skillScore = calculateSkillScore(
+      searchText,
+      scrapingSettings.skillLevels,
+      scrapingSettings.skillWeights
+    );
+
+    // NEW: Language and location checks
+    const hasLangRequirements = hasLanguageRequirements(searchText);
+    const isRemoteFriendly = checkWorkLocationPreference(searchText, "remote");
+    const isLocalOnly = checkWorkLocationPreference(searchText, "local");
+    const requiresVisa = hasVisaSponsorshipRequirement(searchText);
 
     // NEW ATS SCORING
     let atsData = {
@@ -455,7 +587,19 @@ async function extractJobData(card) {
       description,
       matchedKeywords: matchedKeywords.join(", "),
       keywordCount: matchedKeywords.length,
+      // NEW skill scoring fields
+      skillScore: skillScore.totalScore,
+      primarySkillCount: skillScore.primarySkillCount,
+      primarySkills: skillScore.matchedSkills.primary.join(", "),
+      secondarySkills: skillScore.matchedSkills.secondary.join(", "),
+      tertiarySkills: skillScore.matchedSkills.tertiary.join(", "),
+      skillBreakdown: skillScore.breakdown,
       isEnglish: isEnglishText(searchText),
+      // NEW: Language and location fields
+      hasLanguageRequirements: hasLangRequirements,
+      isRemoteFriendly: isRemoteFriendly,
+      isLocalOnly: isLocalOnly,
+      requiresVisaSponsorship: requiresVisa,
       // NEW ATS FIELDS
       atsScore: atsData.score,
       atsMatches: atsData.matches,
@@ -499,306 +643,6 @@ async function determineJobTypeAndLink(linkedinJobUrl) {
   const externalUrl = await interceptApplyUrl(applyButton);
   return { jobType: "External Apply", jobLink: externalUrl || linkedinJobUrl };
 }
-
-// function matchKeywords(text, keywords, options = {}) {
-//   // Input validation and normalization
-//   if (!text || typeof text !== "string") return [];
-//   if (!keywords || !Array.isArray(keywords) || keywords.length === 0) return [];
-
-//   const {
-//     caseSensitive = false,
-//     exactMatch = false,
-//     fuzzyMatch = false,
-//     minSimilarity = 0.8,
-//     returnDetails = false,
-//     customAliases = {},
-//     excludeCommon = true,
-//   } = options;
-
-//   // Enhanced text normalization
-//   const normalizeText = (str) => {
-//     if (!caseSensitive) str = str.toLowerCase();
-
-//     // Handle various separators and special characters
-//     return str
-//       .replace(/[_\-\.]/g, " ") // Convert separators to spaces
-//       .replace(/([a-z])([A-Z])/g, "$1 $2") // Handle camelCase
-//       .replace(/[^a-z0-9\s+#\/]/gi, " ") // Keep alphanumeric, +, #, /
-//       .replace(/\s+/g, " ") // Normalize whitespace
-//       .trim();
-//   };
-
-//   const normalizedText = normalizeText(text);
-
-//   // Extended keyword mapping with more comprehensive aliases
-//   const keywordMap = {
-//     // JavaScript ecosystem
-//     javascript: [
-//       "js",
-//       "javascript",
-//       "js/ts",
-//       "ecmascript",
-//       "es6",
-//       "es2015",
-//       "es2020",
-//       "vanilla js",
-//     ],
-//     typescript: ["ts", "typescript", "js/ts", "tsx"],
-//     nodejs: [
-//       "nodejs",
-//       "node js",
-//       "node.js",
-//       "node",
-//       "server side js",
-//       "backend js",
-//     ],
-
-//     // Frontend frameworks
-//     reactjs: ["react", "reactjs", "react.js", "react native", "jsx"],
-//     vuejs: ["vue", "vuejs", "vue.js", "vue3", "vue 3", "nuxt"],
-//     angular: ["angular", "angularjs", "ng", "angular2+"],
-//     svelte: ["svelte", "sveltekit"],
-
-//     // State management
-//     redux: ["redux", "redux toolkit", "rtk"],
-//     vuex: ["vuex", "pinia"],
-
-//     // Styling
-//     html: ["html", "html5", "markup"],
-//     css: ["css", "css3", "cascading style sheets"],
-//     sass: ["sass", "scss", "syntactically awesome"],
-//     tailwind: ["tailwind", "tailwindcss", "tailwind css"],
-//     bootstrap: ["bootstrap", "bs"],
-
-//     // Backend frameworks
-//     express: ["express", "express.js", "expressjs"],
-//     nestjs: ["nest", "nestjs", "nest.js"],
-//     fastify: ["fastify"],
-//     koa: ["koa", "koa.js"],
-
-//     // Java ecosystem
-//     java: ["java", "jvm"],
-//     springboot: ["springboot", "spring boot", "spring framework", "spring"],
-
-//     // Databases
-//     mysql: ["mysql", "my sql"],
-//     mongodb: ["mongodb", "mongo db", "mongo", "nosql"],
-//     postgresql: ["postgresql", "postgres", "pg"],
-//     redis: ["redis", "in memory db"],
-//     sqlite: ["sqlite", "sqlite3"],
-
-//     // Cloud & DevOps
-//     aws: [
-//       "aws",
-//       "amazon web services",
-//       "ec2",
-//       "s3",
-//       "sns",
-//       "sqs",
-//       "lambda",
-//       "cloudformation",
-//       "rds",
-//     ],
-//     docker: ["docker", "containerization", "containers"],
-//     kubernetes: ["kubernetes", "k8s", "orchestration"],
-
-//     // APIs & Protocols
-//     graphql: ["graphql", "graph ql", "gql"],
-//     restapi: ["rest api", "restful api", "rest", "restful"],
-//     websocket: ["websocket", "ws", "realtime"],
-//     socketio: ["socket.io", "socketio", "socket io"],
-
-//     // Testing
-//     testing: ["unit testing", "testing", "test driven", "tdd", "bdd"],
-//     jest: ["jest", "testing framework"],
-//     cypress: ["cypress", "e2e testing"],
-//     playwright: ["playwright", "browser testing"],
-
-//     // Version control & CI/CD
-//     git: ["git", "version control", "github", "gitlab", "bitbucket"],
-//     cicd: [
-//       "ci/cd",
-//       "cicd",
-//       "ci cd",
-//       "continuous integration",
-//       "continuous deployment",
-//       "github actions",
-//       "jenkins",
-//     ],
-
-//     // Architecture
-//     microservices: ["microservices", "micro services", "distributed"],
-//     serverless: ["serverless", "lambda", "functions as a service", "faas"],
-
-//     // Other tools
-//     bullmq: ["bullmq", "bull mq", "job queue"],
-//     webpack: ["webpack", "bundler"],
-//     vite: ["vite", "build tool"],
-
-//     // Languages
-//     python: ["python", "py"],
-//     golang: ["go", "golang"],
-//     rust: ["rust", "rust lang"],
-//     csharp: ["c#", "csharp", "c sharp", ".net"],
-//     php: ["php"],
-//     ruby: ["ruby", "ruby on rails", "rails"],
-
-//     ...customAliases, // Allow custom aliases to be merged in
-//   };
-
-//   // Fuzzy matching helper (simple Levenshtein distance)
-//   const fuzzyDistance = (a, b) => {
-//     const matrix = Array(b.length + 1)
-//       .fill()
-//       .map(() => Array(a.length + 1).fill(0));
-
-//     for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
-//     for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
-
-//     for (let j = 1; j <= b.length; j++) {
-//       for (let i = 1; i <= a.length; i++) {
-//         const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-//         matrix[j][i] = Math.min(
-//           matrix[j - 1][i] + 1,
-//           matrix[j][i - 1] + 1,
-//           matrix[j - 1][i - 1] + cost
-//         );
-//       }
-//     }
-
-//     return 1 - matrix[b.length][a.length] / Math.max(a.length, b.length);
-//   };
-
-//   // Common words to potentially exclude from fuzzy matching
-//   const commonWords = excludeCommon
-//     ? [
-//         "and",
-//         "or",
-//         "the",
-//         "with",
-//         "for",
-//         "in",
-//         "on",
-//         "at",
-//         "to",
-//         "from",
-//         "of",
-//         "is",
-//         "are",
-//         "was",
-//         "were",
-//       ]
-//     : [];
-
-//   const result = [];
-//   const processedKeywords = new Set(); // Prevent duplicates
-
-//   for (const keyword of keywords) {
-//     if (processedKeywords.has(keyword)) continue;
-
-//     const canonical = caseSensitive
-//       ? keyword.trim()
-//       : keyword.toLowerCase().trim();
-//     const aliases = keywordMap[canonical] || [canonical];
-
-//     let matchFound = false;
-//     let matchType = "none";
-//     let similarity = 0;
-//     let matchedAlias = "";
-
-//     // Exact/word boundary matching
-//     for (const variant of aliases) {
-//       const normalizedVariant = normalizeText(variant);
-
-//       if (exactMatch) {
-//         // Exact match only
-//         if (normalizedText === normalizedVariant) {
-//           matchFound = true;
-//           matchType = "exact";
-//           similarity = 1;
-//           matchedAlias = variant;
-//           break;
-//         }
-//       } else {
-//         // Word boundary matching with improved regex
-//         const pattern = new RegExp(
-//           `\\b${normalizedVariant
-//             .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-//             .replace(/\s+/g, "\\s+")}\\b`,
-//           caseSensitive ? "g" : "gi"
-//         );
-
-//         if (pattern.test(normalizedText)) {
-//           matchFound = true;
-//           matchType = "boundary";
-//           similarity = 1;
-//           matchedAlias = variant;
-//           break;
-//         }
-//       }
-//     }
-
-//     // Fuzzy matching if enabled and no exact match found
-//     if (!matchFound && fuzzyMatch) {
-//       for (const variant of aliases) {
-//         const normalizedVariant = normalizeText(variant);
-
-//         // Skip very short words for fuzzy matching unless they're technical terms
-//         if (
-//           normalizedVariant.length < 3 &&
-//           !["js", "ts", "go", "c#"].includes(normalizedVariant)
-//         )
-//           continue;
-//         if (commonWords.includes(normalizedVariant)) continue;
-
-//         // Split text into words and check fuzzy match against each
-//         const textWords = normalizedText.split(/\s+/);
-//         for (const word of textWords) {
-//           if (word.length >= 3) {
-//             const fuzzySimilarity = fuzzyDistance(normalizedVariant, word);
-//             if (
-//               fuzzySimilarity >= minSimilarity &&
-//               fuzzySimilarity > similarity
-//             ) {
-//               matchFound = true;
-//               matchType = "fuzzy";
-//               similarity = fuzzySimilarity;
-//               matchedAlias = variant;
-//             }
-//           }
-//         }
-//       }
-//     }
-
-//     if (matchFound) {
-//       processedKeywords.add(keyword);
-
-//       if (returnDetails) {
-//         result.push({
-//           keyword,
-//           matched: true,
-//           type: matchType,
-//           similarity,
-//           matchedAlias,
-//           canonical,
-//         });
-//       } else {
-//         result.push(keyword);
-//       }
-//     } else if (returnDetails) {
-//       result.push({
-//         keyword,
-//         matched: false,
-//         type: "none",
-//         similarity: 0,
-//         matchedAlias: "",
-//         canonical,
-//       });
-//     }
-//   }
-
-//   return result;
-// }
 
 async function interceptApplyUrl(applyButton) {
   return new Promise(async (resolve) => {
@@ -938,6 +782,7 @@ function downloadJobs(format = "csv") {
 }
 
 function downloadAsCSV(jobs, headers) {
+  // In downloadAsCSV function, update headers:
   const updatedHeaders = [
     "Title",
     "Company",
@@ -946,9 +791,18 @@ function downloadAsCSV(jobs, headers) {
     "Job Type",
     "Apply Link",
     "LinkedIn Job URL",
-    "Matched Keywords",
-    "Keyword Count",
+    "Primary Skills Count",
+    "Primary Skills Matched",
+    "Secondary Skills Matched",
+    "Tertiary Skills Matched",
+    "Total Skill Score",
     "Is English",
+    "Has Language Requirements",
+    "Remote Friendly",
+    "Local Only",
+    "Requires Visa",
+    "Legacy Keywords",
+    "Keyword Count",
     "ATS Score",
     "ATS Matches",
     "ATS Missing",
@@ -968,9 +822,18 @@ function downloadAsCSV(jobs, headers) {
         `"${escapeCsv(job.jobType)}"`,
         `"${escapeCsv(job.jobLink)}"`,
         `"${escapeCsv(job.linkedinJobUrl)}"`,
+        job.skillScore || 0,
+        job.primarySkillCount || 0,
+        `"${escapeCsv(job.primarySkills)}"`,
+        `"${escapeCsv(job.secondarySkills)}"`,
+        `"${escapeCsv(job.tertiarySkills)}"`,
         `"${escapeCsv(job.matchedKeywords)}"`,
         job.keywordCount || 0,
         job.isEnglish ? "Yes" : "No",
+        job.hasLanguageRequirements ? "Yes" : "No",
+        job.isRemoteFriendly ? "Yes" : "No",
+        job.isLocalOnly ? "Yes" : "No",
+        job.requiresVisaSponsorship ? "Yes" : "No",
         job.atsScore || "",
         `"${escapeCsv(job.atsMatches)}"`,
         `"${escapeCsv(job.atsMissing)}"`,
