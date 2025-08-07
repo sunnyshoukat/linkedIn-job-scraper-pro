@@ -782,10 +782,9 @@ function downloadJobs(format = "csv") {
 }
 
 function downloadAsCSV(jobs, headers) {
-  // In downloadAsCSV function, update headers:
   const updatedHeaders = [
     "Title",
-    "Company",
+    "Company", 
     "When Posted",
     "Total Applicants",
     "Job Type",
@@ -793,22 +792,22 @@ function downloadAsCSV(jobs, headers) {
     "LinkedIn Job URL",
     "Primary Skills Count",
     "Primary Skills Matched",
-    "Secondary Skills Matched",
+    "Secondary Skills Matched", 
     "Tertiary Skills Matched",
     "Total Skill Score",
     "Is English",
     "Has Language Requirements",
     "Remote Friendly",
-    "Local Only",
+    "Local Only", 
     "Requires Visa",
     "Legacy Keywords",
     "Keyword Count",
     "ATS Score",
     "ATS Matches",
-    "ATS Missing",
+    "ATS Missing", 
     "ATS Suggestions",
     "Description",
-    "Timestamp",
+    "Timestamp"
   ];
 
   const csvContent = [
@@ -822,26 +821,26 @@ function downloadAsCSV(jobs, headers) {
         `"${escapeCsv(job.jobType)}"`,
         `"${escapeCsv(job.jobLink)}"`,
         `"${escapeCsv(job.linkedinJobUrl)}"`,
-        job.skillScore || 0,
         job.primarySkillCount || 0,
         `"${escapeCsv(job.primarySkills)}"`,
         `"${escapeCsv(job.secondarySkills)}"`,
         `"${escapeCsv(job.tertiarySkills)}"`,
-        `"${escapeCsv(job.matchedKeywords)}"`,
-        job.keywordCount || 0,
+        job.skillScore || 0,
         job.isEnglish ? "Yes" : "No",
-        job.hasLanguageRequirements ? "Yes" : "No",
+        job.hasLanguageRequirements ? "Yes" : "No", 
         job.isRemoteFriendly ? "Yes" : "No",
         job.isLocalOnly ? "Yes" : "No",
         job.requiresVisaSponsorship ? "Yes" : "No",
+        `"${escapeCsv(job.matchedKeywords)}"`,
+        job.keywordCount || 0,
         job.atsScore || "",
         `"${escapeCsv(job.atsMatches)}"`,
         `"${escapeCsv(job.atsMissing)}"`,
         `"${escapeCsv(job.atsSuggestions)}"`,
         `"${escapeCsv(job.description || "")}"`,
-        `"${escapeCsv(job.timestamp)}"`,
+        `"${escapeCsv(job.timestamp)}"`
       ].join(",")
-    ),
+    )
   ].join("\n");
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
