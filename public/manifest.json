@@ -45,5 +45,7 @@
       "resources": ["assets/*"],
       "matches": ["*://*.linkedin.com/*"]
     }
-  ]
+  ],
+
+  "options_page": "options.html"
 }

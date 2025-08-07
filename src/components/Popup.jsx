@@ -1193,6 +1193,20 @@ const Popup = () => {
               🗑️ Clear
             </button>
           </div>
+          
+          {/* Browse Jobs Button */}
+          <div className="mt-3">
+            <button
+              onClick={() => chrome.runtime.openOptionsPage()}
+              disabled={jobsFound === 0}
+              className={`w-full py-2 px-3 rounded-lg font-medium transition-all ${jobsFound === 0
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed opacity-60'
+                : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 shadow-md hover:shadow-lg'
+                }`}
+            >
+              📋 Browse & Manage Jobs
+            </button>
+          </div>
         </div>
 
         {/* LinkedIn Warning */}
@@ -1219,7 +1233,12 @@ const Popup = () => {
           <p>
             Smart filtering • Keyword matching • Auto-detection<br />
             Easy Apply + External links • Multi-language support<br />
-            <a href="#" className="text-blue-600 hover:underline">Need help?</a> • Made with ❤️
+            <button 
+              onClick={() => chrome.runtime.openOptionsPage()}
+              className="text-blue-600 hover:underline cursor-pointer bg-transparent border-none"
+            >
+              📋 Browse Jobs
+            </button> • Made with ❤️
           </p>
         </div>
       </div>

@@ -10,29 +10,6 @@ let tabMonitoring = {
 chrome.runtime.onSuspend.addListener(() => {
   resetTabMonitoring();
 });
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  switch (request.type) {
-    case "getCurrentTab":
-      handleGetCurrentTab(sendResponse);
-      return true;
-    case "updateBadge":
-      handleUpdateBadge(request, sender, sendResponse);
-      break;
-    case "onLinkedIn":
-      handleOnLinkedIn(sender, sendResponse);
-      break;
-    case "startTabMonitoring":
-      startTabMonitoring();
-      sendResponse({ status: "monitoring" });
-      break;
-    case "getMonitoredUrl":
-      sendResponse({ url: tabMonitoring.capturedUrl });
-      resetTabMonitoring();
-      break;
-    default:
-      console.warn("Unknown message type:", request.type);
-  }
-});
 function handleGetCurrentTab(sendResponse) {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     sendResponse({ url: tabs[0]?.url });
@@ -140,15 +117,29 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 const ConnectionManager = {
   async ensureContentScript(tabId) {
     try {
+      // Check if tab exists first
+      const tab = await chrome.tabs.get(tabId).catch(() => null);
+      if (!tab) {
+        console.warn(`Tab ${tabId} does not exist`);
+        return false;
+      }
+      
       // Try to ping the content script first
       await chrome.tabs.sendMessage(tabId, { type: "ping" });
       return true;
     } catch (error) {
       // Content script not available, try to inject it
       try {
+        // Check if tab still exists before injection
+        const tab = await chrome.tabs.get(tabId).catch(() => null);
+        if (!tab) {
+          console.warn(`Tab ${tabId} does not exist, cannot inject`);
+          return false;
+        }
+        
         await chrome.scripting.executeScript({
           target: { tabId: tabId },
-          files: ['content.js']
+          files: ['scripts/content.js']
         });
         
         // Wait for content script to initialize

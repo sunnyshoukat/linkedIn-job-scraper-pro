@@ -12,6 +12,10 @@ const {
 
 let isScrapingActive = false;
 let allJobData = [];
+let scrapedPages = 0;
+let maxConsecutiveFailures = 5;
+let currentFailures = 0;
+let visitedJobIds = new Set();
 let scrapingSettings = {
   keywords: [
     "JavaScript",
@@ -175,6 +179,7 @@ function handleDownloadJobs(request, sendResponse) {
 function handleClearData(sendResponse) {
   allJobData = [];
   localStorage.removeItem("linkedinJobs");
+  chrome.storage.local.remove(['jobDescriptions']);
   sendResponse({ status: "success" });
 }
 
@@ -190,6 +195,9 @@ function startJobScraping() {
   }
   isScrapingActive = true;
   allJobData = [];
+  scrapedPages = 0;
+  currentFailures = 0;
+  visitedJobIds.clear();
   console.log("Starting job scraping with filters:", scrapingSettings);
   chrome.runtime.sendMessage({
     type: "updateBadge",
@@ -247,23 +255,45 @@ async function startFetchingJobs() {
   if (!isScrapingActive) return;
   try {
     const cards = await getJobCards();
-    console.log(`Found ${cards.length} job cards`);
+    console.log(`Found ${cards.length} job cards on page ${scrapedPages + 1}`);
+
+    if (cards.length === 0) {
+      currentFailures++;
+      if (currentFailures >= maxConsecutiveFailures) {
+        console.log('No more job cards found after multiple attempts. Stopping scraping.');
+        stopJobScraping();
+        showScrapingCompleteNotification(allJobData.length, 'No more jobs available');
+        return;
+      }
+    } else {
+      currentFailures = 0; // Reset failure count
+    }
 
     for (let i = 0; i < cards.length && isScrapingActive; i++) {
       const card = cards[i];
       card.style.border = "3px solid #0073b1";
       card.style.backgroundColor = "#f3f6f8";
 
+      // Extract job ID early to prevent duplicates
+      const jobId = extractJobId(card);
+      if (visitedJobIds.has(jobId)) {
+        console.log(`Job already processed: ${jobId}`);
+        card.style.border = "3px solid #9CA3AF";
+        card.style.backgroundColor = "#F3F4F6";
+        continue;
+      }
+      visitedJobIds.add(jobId);
+
       const jobLink = card.querySelector(
         ".job-card-container__link, .job-card-list__title, a[data-control-name='job_card_title']"
       );
 
       if (jobLink) {
+        // Click job to get basic info
         jobLink.click();
-        await waitForJobDescriptionReady();
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 800));
 
-        // EARLY APPLICANT COUNT CHECK
+        // EARLY APPLICANT COUNT CHECK - before waiting for full description
         const applicantCount = getQuickApplicantCount();
         if (
           applicantCount > scrapingSettings.maxApplicants ||
@@ -275,16 +305,20 @@ async function startFetchingJobs() {
           card.style.border = "3px solid #FF9800";
           card.style.backgroundColor = "#fff3e0";
 
-          // Move to next job without further processing
+          // Move to next job without waiting for description
           if (i < cards.length - 1) {
             cards[i + 1].scrollIntoView({
               behavior: "smooth",
               block: "center",
             });
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 300));
           }
           continue;
         }
+
+        // Now wait for full job description only if applicant count passes
+        await waitForJobDescriptionReady();
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
         // ADD ATS processing indicator
         if (scrapingSettings.useATS) {
@@ -339,22 +373,47 @@ async function startFetchingJobs() {
       }
     }
 
+    // Save to both localStorage (for backward compatibility) and Chrome storage
     localStorage.setItem("linkedinJobs", JSON.stringify(allJobData));
-    console.log(`Saved ${allJobData.length} jobs to localStorage`);
+    chrome.storage.local.set({ jobDescriptions: allJobData });
+    console.log(`Saved ${allJobData.length} jobs to localStorage and Chrome storage`);
+
+    scrapedPages++;
+    console.log(`Completed page ${scrapedPages}`);
 
     if (isScrapingActive) {
+      // Check if we've reached max pages
+      if (scrapedPages >= (scrapingSettings.maxPages || 10)) {
+        console.log(`Reached maximum pages (${scrapingSettings.maxPages}). Stopping scraping.`);
+        stopJobScraping();
+        showScrapingCompleteNotification(allJobData.length, `Completed ${scrapedPages} pages`);
+        return;
+      }
       clickOnNextButton();
     }
   } catch (error) {
     console.error("Error in startFetchingJobs:", error);
-    stopJobScraping();
+    currentFailures++;
+    if (currentFailures >= maxConsecutiveFailures) {
+      stopJobScraping();
+      showScrapingCompleteNotification(allJobData.length, 'Stopped due to errors');
+    } else {
+      // Retry after a delay
+      setTimeout(() => {
+        if (isScrapingActive) startFetchingJobs();
+      }, 3000);
+    }
   }
 }
 
 function passesFilters(jobData) {
   if (!jobData) return false;
+  
+  // Applicant count filters
   if (jobData.totalClick > scrapingSettings.maxApplicants) return false;
   if (jobData.totalClick < scrapingSettings.minApplicants) return false;
+  
+  // Job type filters
   if (scrapingSettings.easyApplyOnly && jobData.jobType !== "Easy Apply")
     return false;
   if (
@@ -362,25 +421,28 @@ function passesFilters(jobData) {
     jobData.jobType !== "External Apply"
   )
     return false;
-  if (scrapingSettings.keywords.length > 3 && jobData.keywordCount === 0)
-    return false;
+    
+  // Language filter
   if (scrapingSettings.englishOnly && !jobData.isEnglish) return false;
+  
+  // Language requirements filter
+  if (scrapingSettings.skipLanguageRequirements && jobData.hasLanguageRequirements)
+    return false;
 
-  // NEW: Primary skills requirement (must match at least X primary skills)
+  // Enhanced skill matching - must have minimum skills AND score
   if (jobData.primarySkillCount < scrapingSettings.minPrimarySkills)
     return false;
-  // NEW: Skill score filter (replaces simple keyword count check)
   if (jobData.skillScore < scrapingSettings.minSkillScore) return false;
 
-  // NEW: Work location preference filters
+  // Work location preference filters
   if (scrapingSettings.remoteOnly && !jobData.isRemoteFriendly) return false;
   if (scrapingSettings.localHireOnly && !jobData.isLocalOnly) return false;
 
-  // NEW: Visa sponsorship filter
+  // Visa sponsorship filter
   if (scrapingSettings.skipVisaSponsorship && jobData.requiresVisaSponsorship)
     return false;
 
-  // NEW ATS FILTER
+  // ATS score filter
   if (scrapingSettings.useATS && jobData.atsScore !== null) {
     if (jobData.atsScore < scrapingSettings.minATSScore) return false;
   }
@@ -675,19 +737,30 @@ function clickOnNextButton() {
   const nextButton = document.querySelector(
     ".jobs-search-pagination__button--next, .artdeco-pagination__button--next"
   );
-  if (nextButton && !nextButton.disabled) {
+  
+  // Also check for "Show more jobs" button
+  const showMoreButton = document.querySelector(
+    ".infinite-scroller__show-more-button, .jobs-search-no-results-banner__load-more-jobs"
+  );
+  
+  if (nextButton && !nextButton.disabled && !nextButton.classList.contains('disabled')) {
     nextButton.click();
     setTimeout(() => {
       if (isScrapingActive) startFetchingJobs();
     }, 3000);
+  } else if (showMoreButton && !showMoreButton.disabled) {
+    showMoreButton.click();
+    setTimeout(() => {
+      if (isScrapingActive) startFetchingJobs();
+    }, 3000);
   } else {
-    console.log(`Scraping completed! Total jobs found: ${allJobData.length}`);
+    console.log(`Scraping completed! Total jobs found: ${allJobData.length}. Scanned ${scrapedPages} pages.`);
     stopJobScraping();
-    showScrapingCompleteNotification(allJobData.length);
+    showScrapingCompleteNotification(allJobData.length, `Completed all available pages (${scrapedPages})`);
   }
 }
 
-function showScrapingCompleteNotification(jobCount) {
+function showScrapingCompleteNotification(jobCount, reason = '') {
   const notification = document.createElement("div");
   notification.style.cssText = `
     position: fixed; top: 20px; right: 20px; 
@@ -704,6 +777,7 @@ function showScrapingCompleteNotification(jobCount) {
     </div>
     <div style="font-size: 12px; opacity: 0.9;">
       Found <strong>${jobCount}</strong> matching jobs<br>
+      ${reason ? `<em>${reason}</em><br>` : ''}
       <em>Click the extension to download</em>
     </div>
   `;
@@ -754,6 +828,34 @@ function getCurrentLinkedInJobUrl() {
     : window.location.href;
 }
 
+function extractJobId(card) {
+  // Try to extract job ID from various sources
+  const jobLink = card.querySelector(
+    "a[data-control-name='job_card_title'], .job-card-list__title a, .job-card-container__link"
+  );
+  
+  if (jobLink && jobLink.href) {
+    const jobIdMatch = jobLink.href.match(/\/jobs\/view\/(\d+)/);
+    if (jobIdMatch) {
+      return jobIdMatch[1];
+    }
+  }
+  
+  // Fallback: try to find job ID in data attributes
+  const jobIdAttr = card.querySelector('[data-job-id]');
+  if (jobIdAttr) {
+    return jobIdAttr.getAttribute('data-job-id');
+  }
+  
+  // Last fallback: use card text content hash
+  const titleElement = card.querySelector('.job-card-list__title, .job-card-container__metadata-item');
+  if (titleElement) {
+    return btoa(titleElement.textContent.trim()).substring(0, 10);
+  }
+  
+  return Date.now().toString(); // Ultimate fallback
+}
+
 function downloadJobs(format = "csv") {
   const jobs = JSON.parse(localStorage.getItem("linkedinJobs") || "[]");
   if (jobs.length === 0) {
@@ -774,15 +876,25 @@ function downloadJobs(format = "csv") {
     "Description",
     "Timestamp",
   ];
+  
+  console.log(`Downloading jobs as ${format}`);
+  
   if (format === "csv") {
     downloadAsCSV(jobs, headers);
-  } else {
+  } else if (format === "excel" || format === "xlsx") {
     downloadAsExcel(jobs, headers);
+  } else {
+    // Default fallback to CSV for unknown formats
+    console.warn(`Unknown format '${format}', defaulting to CSV`);
+    downloadAsCSV(jobs, headers);
   }
 }
 
 function downloadAsCSV(jobs, headers) {
-  const updatedHeaders = [
+  // Check if any job has ATS data to conditionally include ATS columns
+  const hasATSData = jobs.some(job => job.atsScore !== null && job.atsScore !== undefined);
+  
+  let updatedHeaders = [
     "Title",
     "Company", 
     "When Posted",
@@ -801,19 +913,24 @@ function downloadAsCSV(jobs, headers) {
     "Local Only", 
     "Requires Visa",
     "Legacy Keywords",
-    "Keyword Count",
-    "ATS Score",
-    "ATS Matches",
-    "ATS Missing", 
-    "ATS Suggestions",
-    "Description",
-    "Timestamp"
+    "Keyword Count"
   ];
+  
+  if (hasATSData) {
+    updatedHeaders.push(
+      "ATS Score",
+      "ATS Matches",
+      "ATS Missing", 
+      "ATS Suggestions"
+    );
+  }
+  
+  updatedHeaders.push("Description", "Timestamp");
 
   const csvContent = [
     updatedHeaders.join(","),
-    ...jobs.map((job) =>
-      [
+    ...jobs.map((job) => {
+      let row = [
         `"${escapeCsv(job.title)}"`,
         `"${escapeCsv(job.company)}"`,
         `"${escapeCsv(job.whenPosted)}"`,
@@ -832,15 +949,25 @@ function downloadAsCSV(jobs, headers) {
         job.isLocalOnly ? "Yes" : "No",
         job.requiresVisaSponsorship ? "Yes" : "No",
         `"${escapeCsv(job.matchedKeywords)}"`,
-        job.keywordCount || 0,
-        job.atsScore || "",
-        `"${escapeCsv(job.atsMatches)}"`,
-        `"${escapeCsv(job.atsMissing)}"`,
-        `"${escapeCsv(job.atsSuggestions)}"`,
+        job.keywordCount || 0
+      ];
+      
+      if (hasATSData) {
+        row.push(
+          job.atsScore || "",
+          `"${escapeCsv(job.atsMatches)}"`,
+          `"${escapeCsv(job.atsMissing)}"`,
+          `"${escapeCsv(job.atsSuggestions)}"`
+        );
+      }
+      
+      row.push(
         `"${escapeCsv(job.description || "")}"`,
         `"${escapeCsv(job.timestamp)}"`
-      ].join(",")
-    )
+      );
+      
+      return row.join(",");
+    })
   ].join("\n");
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -851,7 +978,6 @@ function downloadAsCSV(jobs, headers) {
   showDownloadNotification(jobs.length, "CSV");
 }
 
-// 8. UPDATE downloadAsExcel function (replace the wsData array and colWidths)
 function downloadAsExcel(jobs, headers) {
   if (!Array.isArray(jobs) || jobs.length === 0) {
     console.warn("No jobs to export.");
@@ -882,9 +1008,12 @@ function downloadAsExcel(jobs, headers) {
       console.log("Generating Excel file with", jobs.length, "jobs");
 
       const wb = XLSX.utils.book_new();
+      
+      // Check if any job has ATS data to conditionally include ATS columns
+      const hasATSData = jobs.some(job => job.atsScore !== null && job.atsScore !== undefined);
 
-      // UPDATED headers and data mapping
-      const updatedHeaders = [
+      // Dynamic headers based on data availability
+      let updatedHeaders = [
         "Title",
         "Company",
         "When Posted",
@@ -892,43 +1021,78 @@ function downloadAsExcel(jobs, headers) {
         "Job Type",
         "Apply Link",
         "LinkedIn Job URL",
-        "Matched Keywords",
-        "Keyword Count",
+        "Primary Skills Count",
+        "Primary Skills Matched",
+        "Secondary Skills Matched", 
+        "Tertiary Skills Matched",
+        "Total Skill Score",
         "Is English",
-        "ATS Score",
-        "ATS Matches",
-        "ATS Missing",
-        "ATS Suggestions",
-        "Description",
-        "Timestamp",
+        "Has Language Requirements",
+        "Remote Friendly",
+        "Local Only", 
+        "Requires Visa",
+        "Legacy Keywords",
+        "Keyword Count",
       ];
+      
+      if (hasATSData) {
+        updatedHeaders.push(
+          "ATS Score",
+          "ATS Matches",
+          "ATS Missing",
+          "ATS Suggestions"
+        );
+      }
+      
+      updatedHeaders.push("Description", "Timestamp");
 
       const wsData = [
         updatedHeaders,
-        ...jobs.map((job) => [
-          job.title || "",
-          job.company || "",
-          job.whenPosted || "",
-          job.totalClick || 0,
-          job.jobType || "",
-          job.jobLink || "",
-          job.linkedinJobUrl || "",
-          job.matchedKeywords || "",
-          job.keywordCount || 0,
-          job.isEnglish ? "Yes" : "No",
-          job.atsScore || "",
-          job.atsMatches || "",
-          job.atsMissing || "",
-          job.atsSuggestions || "",
-          (job.description || "").substring(0, 500) + "...",
-          job.timestamp || "",
-        ]),
+        ...jobs.map((job) => {
+          let row = [
+            job.title || "",
+            job.company || "",
+            job.whenPosted || "",
+            job.totalClick || 0,
+            job.jobType || "",
+            job.jobLink || "",
+            job.linkedinJobUrl || "",
+            job.primarySkillCount || 0,
+            job.primarySkills || "",
+            job.secondarySkills || "",
+            job.tertiarySkills || "",
+            job.skillScore || 0,
+            job.isEnglish ? "Yes" : "No",
+            job.hasLanguageRequirements ? "Yes" : "No", 
+            job.isRemoteFriendly ? "Yes" : "No",
+            job.isLocalOnly ? "Yes" : "No",
+            job.requiresVisaSponsorship ? "Yes" : "No",
+            job.matchedKeywords || "",
+            job.keywordCount || 0,
+          ];
+          
+          if (hasATSData) {
+            row.push(
+              job.atsScore || "",
+              job.atsMatches || "",
+              job.atsMissing || "",
+              job.atsSuggestions || ""
+            );
+          }
+          
+          row.push(
+            (job.description || "").substring(0, 500) + "...",
+            job.timestamp || ""
+          );
+          
+          return row;
+        }),
       ];
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-      // UPDATED column widths
-      const colWidths = [
+      // Dynamic column widths
+      let colWidths = [
         { width: 30 }, // Title
         { width: 20 }, // Company
         { width: 15 }, // When Posted
@@ -936,16 +1100,33 @@ function downloadAsExcel(jobs, headers) {
         { width: 15 }, // Job Type
         { width: 40 }, // Apply Link
         { width: 40 }, // LinkedIn Job URL
-        { width: 25 }, // Matched Keywords
-        { width: 12 }, // Keyword Count
+        { width: 15 }, // Primary Skills Count
+        { width: 25 }, // Primary Skills Matched
+        { width: 25 }, // Secondary Skills Matched
+        { width: 25 }, // Tertiary Skills Matched
+        { width: 15 }, // Total Skill Score
         { width: 10 }, // Is English
-        { width: 10 }, // ATS Score
-        { width: 30 }, // ATS Matches
-        { width: 30 }, // ATS Missing
-        { width: 40 }, // ATS Suggestions
-        { width: 60 }, // Description
-        { width: 20 }, // Timestamp
+        { width: 15 }, // Has Language Requirements
+        { width: 12 }, // Remote Friendly
+        { width: 10 }, // Local Only
+        { width: 12 }, // Requires Visa
+        { width: 25 }, // Legacy Keywords
+        { width: 12 }, // Keyword Count
       ];
+      
+      if (hasATSData) {
+        colWidths.push(
+          { width: 10 }, // ATS Score
+          { width: 30 }, // ATS Matches
+          { width: 30 }, // ATS Missing
+          { width: 40 }  // ATS Suggestions
+        );
+      }
+      
+      colWidths.push(
+        { width: 60 }, // Description
+        { width: 20 }  // Timestamp
+      );
 
       ws["!cols"] = colWidths;
       XLSX.utils.book_append_sheet(wb, ws, "LinkedIn Jobs");

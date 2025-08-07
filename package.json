@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "build:extension": "vite build && npm run copy-files",
-    "copy-files": "cp -r public/* dist/"
+    "copy-files": "cp -r public/* dist/ && cp src/options.html dist/options.html"
   },
   "dependencies": {
     "react": "^18.2.0",

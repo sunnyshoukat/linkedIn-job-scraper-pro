@@ -18,6 +18,7 @@ export default defineConfig({
           __dirname,
           "src/scripts/helpers/languageAndLocationHelper.js"
         ),
+        optionsScript: resolve(__dirname, "src/options.js"),
       },
       output: {
         entryFileNames: (chunkInfo) => {
@@ -34,6 +35,11 @@ export default defineConfig({
           ) {
             return `scripts/helpers/${chunkInfo.name}.js`;
           }
+          
+          if (chunkInfo.name === "optionsScript") {
+            return "options.js";
+          }
+          
           return "assets/[name]-[hash].js";
         },
         chunkFileNames: "assets/[name]-[hash].js",
