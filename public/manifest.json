@@ -2,11 +2,11 @@
   "manifest_version": 3,
   "name": "LinkedIn Job Scraper Pro",
   "version": "2.1.0",
-  "description": "Advanced LinkedIn job scraper with smart filtering, keyword matching, and AI ATS scoring",
+  "description": "Advanced LinkedIn job scraper with smart filtering, keyword matching, and skill-based scoring",
 
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
 
-  "host_permissions": ["*://*.linkedin.com/*", "https://openrouter.ai/*"],
+  "host_permissions": ["*://*.linkedin.com/*"],
 
   "background": {
     "service_worker": "scripts/background.js"
@@ -42,7 +42,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["assets/*"],
+      "resources": ["assets/*", "libs/*"],
       "matches": ["*://*.linkedin.com/*"]
     }
   ],

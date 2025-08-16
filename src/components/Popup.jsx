@@ -24,12 +24,6 @@ const Popup = () => {
   const [autoScroll, setAutoScroll] = useState(true);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
 
-  // AI Settings state
-  const [enableAI, setEnableAI] = useState(false);
-  const [resumeText, setResumeText] = useState('');
-  const [openRouterAPIKey, setOpenRouterAPIKey] = useState('');
-  const [minAtsScore, setMinAtsScore] = useState(70);
-  const [includeKeywordAnalysis, setIncludeKeywordAnalysis] = useState(true);
 
   // Collapsible sections state
   const [collapsedSections, setCollapsedSections] = useState({
@@ -141,13 +135,8 @@ const Popup = () => {
       maxPages,
       autoScroll,
       skipDuplicates,
-      useATS: enableAI,
-      resumeText,
-      openRouterAPIKey: openRouterAPIKey || sessionStorage.getItem("openRouterApiKey"),
-      minATSScore: minAtsScore,
-      includeKeywordAnalysis,
     };
-  }, [keywords, primarySkills, secondarySkills, tertiarySkills, skillWeights, minSkillScore, minPrimarySkills, skipLanguageRequirements, remoteOnly, localHireOnly, skipVisaSponsorship, maxApplicants, minApplicants, easyApplyOnly, externalApplyOnly, englishOnly, matchAnyKeyword, caseSensitive, scrapingDelay, maxPages, autoScroll, skipDuplicates, enableAI, resumeText, openRouterAPIKey, minAtsScore, includeKeywordAnalysis]);
+  }, [keywords, primarySkills, secondarySkills, tertiarySkills, skillWeights, minSkillScore, minPrimarySkills, skipLanguageRequirements, remoteOnly, localHireOnly, skipVisaSponsorship, maxApplicants, minApplicants, easyApplyOnly, externalApplyOnly, englishOnly, matchAnyKeyword, caseSensitive, scrapingDelay, maxPages, autoScroll, skipDuplicates]);
 
   // Save settings to localStorage
   const saveSettings = useCallback(() => {
@@ -186,25 +175,8 @@ const Popup = () => {
       setLocalHireOnly(settings.localHireOnly || false);
       setSkipVisaSponsorship(settings.skipVisaSponsorship || false);
     }
-    loadAISettings();
   }, [keywords]);
 
-  // Load AI settings
-  const loadAISettings = () => {
-    const saved = localStorage.getItem("aiSettings");
-    if (saved) {
-      const settings = JSON.parse(saved);
-      setResumeText(settings.resumeText || "");
-      setMinAtsScore(settings.minAtsScore || 70);
-      setIncludeKeywordAnalysis(settings.includeKeywordAnalysis !== false);
-      setEnableAI(settings.enableAI || false);
-    }
-
-    const apiKey = sessionStorage.getItem("openRouterApiKey");
-    if (apiKey) {
-      setOpenRouterAPIKey(apiKey);
-    }
-  };
 
   // Check current tab
   const checkCurrentTab = useCallback(async () => {
@@ -413,9 +385,6 @@ const Popup = () => {
       // Clear all stored data
       localStorage.removeItem("jobScraperSettings");
       localStorage.removeItem("linkedinJobs");
-      localStorage.removeItem("resumeText");
-      localStorage.removeItem("aiSettings");
-      sessionStorage.removeItem("openRouterApiKey");
 
       const results = await Promise.all(clearPromises);
       const successCount = results.filter((r) => r?.status === "success").length;
@@ -423,10 +392,6 @@ const Popup = () => {
       setIsActive(false);
       setJobsFound(0);
 
-      // Reset AI form
-      setResumeText("");
-      setOpenRouterAPIKey("");
-      setEnableAI(false);
 
       showMessage(`Cleared data from ${successCount} tabs`, "success");
     } catch (error) {
@@ -435,73 +400,6 @@ const Popup = () => {
     }
   };
 
-  const saveAISettings = async () => {
-    const settings = {
-      resumeText,
-      openRouterAPIKey,
-      minAtsScore,
-      includeKeywordAnalysis,
-      useATS: enableAI,
-    };
-
-    localStorage.setItem("aiSettings", JSON.stringify(settings));
-
-    if (settings.openRouterAPIKey) {
-      sessionStorage.setItem("openRouterApiKey", settings.openRouterAPIKey);
-    }
-
-    showMessage("AI settings saved successfully!", "success");
-  };
-
-  const testAIConnection = async () => {
-    if (!openRouterAPIKey) {
-      showMessage("Please enter your OpenRouter API key", "error");
-      return;
-    }
-
-    if (!resumeText) {
-      showMessage("Please enter your resume text", "error");
-      return;
-    }
-
-    try {
-      const testJobDescription = "We are looking for a Software Engineer with experience in JavaScript and React.";
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${openRouterAPIKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.href,
-          "X-Title": "LinkedIn Job Scraper Pro",
-        },
-        body: JSON.stringify({
-          model: "deepseek/deepseek-r1-0528:free",
-          messages: [
-            {
-              role: "system",
-              content: "You are an ATS (Applicant Tracking System) analyzer. Analyze the resume against the job description and provide a score from 0-100 and brief feedback.",
-            },
-            {
-              role: "user",
-              content: `Resume: ${resumeText}\n\nJob Description: ${testJobDescription}\n\nProvide ATS score (0-100) and brief analysis.`,
-            },
-          ],
-          max_tokens: 150,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || "API request failed");
-      }
-
-      showMessage("✅ AI connection successful! API key is working.", "success");
-    } catch (error) {
-      console.error("AI connection test failed:", error);
-      showMessage(`AI connection failed: ${error.message}`, "error");
-    }
-  };
 
   // Toggle collapsible sections
   const toggleSection = (section) => {
@@ -897,104 +795,6 @@ const Popup = () => {
           )}
         </div>
 
-        {/* AI ATS Score Section */}
-        <div className="border-b border-gray-200">
-          <button
-            onClick={() => toggleSection('ai')}
-            className="w-full p-4 text-left font-semibold flex items-center justify-between hover:bg-gray-50 transition-colors"
-          >
-            <span className="flex items-center space-x-2">
-              <span>🤖</span>
-              <span>AI ATS Score Filter</span>
-            </span>
-            <span className={`transform transition-transform ${collapsedSections.ai ? 'rotate-180' : ''}`}>
-              ▼
-            </span>
-          </button>
-
-          {!collapsedSections.ai && (
-            <div className="p-4 pt-0">
-              <label className="flex items-center justify-between mb-4">
-                <span>Enable AI ATS Scoring</span>
-                <input
-                  type="checkbox"
-                  checked={enableAI}
-                  onChange={(e) => setEnableAI(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                />
-              </label>
-
-              {enableAI && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">📄 Resume Text:</label>
-                    <textarea
-                      value={resumeText}
-                      onChange={(e) => setResumeText(e.target.value)}
-                      rows={4}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Paste your resume text here..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">🔑 OpenRouter API Key:</label>
-                    <input
-                      type="password"
-                      value={openRouterAPIKey}
-                      onChange={(e) => setOpenRouterAPIKey(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Enter your OpenRouter API key"
-                    />
-                    <small className="text-gray-600 text-xs">
-                      Get your API key from <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">openrouter.ai</a>
-                    </small>
-                  </div>
-
-                  <div className="flex items-center space-x-4">
-                    <label className="flex items-center space-x-2">
-                      <span>Minimum ATS Score:</span>
-                      <input
-                        type="number"
-                        value={minAtsScore}
-                        onChange={(e) => setMinAtsScore(parseInt(e.target.value) || 70)}
-                        min="0"
-                        max="100"
-                        className="w-16 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <span>%</span>
-                    </label>
-                  </div>
-
-                  <label className="flex items-center justify-between">
-                    <span>Include keyword analysis</span>
-                    <input
-                      type="checkbox"
-                      checked={includeKeywordAnalysis}
-                      onChange={(e) => setIncludeKeywordAnalysis(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                  </label>
-
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={saveAISettings}
-                      className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                    >
-                      💾 Save AI Settings
-                    </button>
-                    <button
-                      onClick={testAIConnection}
-                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                    >
-                      🧪 Test Connection
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
         {/* Filters Section */}
         <div className="border-b border-gray-200">

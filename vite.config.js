@@ -1,10 +1,31 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";
+import { copyFileSync, existsSync, mkdirSync } from "fs";
+import path from "path";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'copy-options-html',
+      generateBundle() {
+        // Copy options.html to the correct location
+        const srcPath = resolve(__dirname, 'src/options.html');
+        const destPath = resolve(__dirname, 'dist/options.html');
+        if (existsSync(srcPath)) {
+          // Ensure dist directory exists
+          const distDir = path.dirname(destPath);
+          if (!existsSync(distDir)) {
+            mkdirSync(distDir, { recursive: true });
+          }
+          copyFileSync(srcPath, destPath);
+        }
+      }
+    }
+  ],
   build: {
+    target: 'esnext',
     rollupOptions: {
       input: {
         popup: resolve(__dirname, "index.html"),

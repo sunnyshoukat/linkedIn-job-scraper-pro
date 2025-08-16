@@ -26,6 +26,7 @@ class JobBrowser {
         // Button events
         document.getElementById('refresh-btn').addEventListener('click', this.refresh.bind(this));
         document.getElementById('download-all-btn').addEventListener('click', this.downloadAll.bind(this));
+        document.getElementById('clear-all-btn').addEventListener('click', this.clearAll.bind(this));
         
         // Modal events
         document.getElementById('close-modal').addEventListener('click', this.closeModal.bind(this));
@@ -74,12 +75,12 @@ class JobBrowser {
 
     updateStats() {
         const totalJobs = this.jobs.length;
-        const withATS = this.jobs.filter(job => job.atsScore !== null && job.atsScore !== undefined).length;
+        const withScores = this.jobs.filter(job => job.skillScore !== null && job.skillScore !== undefined).length;
         const avgScore = totalJobs > 0 ? Math.round(this.jobs.reduce((sum, job) => sum + (job.skillScore || 0), 0) / totalJobs) : 0;
         const easyApply = this.jobs.filter(job => job.jobType === 'Easy Apply').length;
         
         document.getElementById('total-jobs').textContent = totalJobs;
-        document.getElementById('with-ats').textContent = withATS;
+        document.getElementById('with-scores').textContent = withScores;
         document.getElementById('avg-score').textContent = avgScore;
         document.getElementById('easy-apply').textContent = easyApply;
     }
@@ -122,8 +123,6 @@ class JobBrowser {
                     return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
                 case 'skill-score':
                     return (b.skillScore || 0) - (a.skillScore || 0);
-                case 'ats-score':
-                    return (b.atsScore || 0) - (a.atsScore || 0);
                 case 'applicants-asc':
                     return (a.totalClick || 0) - (b.totalClick || 0);
                 case 'applicants-desc':
@@ -164,13 +163,11 @@ class JobBrowser {
     }
 
     createJobCard(job) {
-        const hasATS = job.atsScore !== null && job.atsScore !== undefined;
         const primarySkills = job.primarySkills ? job.primarySkills.split(', ').slice(0, 3) : [];
         const postedDate = this.formatDate(job.whenPosted);
         
         return `
-            <div class="job-card ${hasATS ? 'has-ats' : ''}" data-job-id="${job.linkedinJobUrl}">
-                ${hasATS ? `<div class="ats-badge">${job.atsScore}/100</div>` : ''}
+            <div class="job-card" data-job-id="${job.linkedinJobUrl}">
                 
                 <div class="job-title">${this.escapeHtml(job.title || 'Unknown Title')}</div>
                 <div class="job-company">${this.escapeHtml(job.company || 'Unknown Company')}</div>
@@ -278,18 +275,6 @@ class JobBrowser {
         document.getElementById('modal-job-type').textContent = job.jobType || 'Unknown';
         document.getElementById('modal-skill-score').textContent = `${job.skillScore || 0} points`;
         
-        // Handle ATS section
-        const atsSection = document.getElementById('ats-sidebar');
-        if (job.atsScore !== null && job.atsScore !== undefined) {
-            atsSection.style.display = 'block';
-            atsSection.className = 'sidebar-section ats-section';
-            document.getElementById('modal-ats-score').textContent = `${job.atsScore}/100`;
-            document.getElementById('modal-ats-matches').textContent = job.atsMatches || 'None specified';
-            document.getElementById('modal-ats-missing').textContent = job.atsMissing || 'None specified';
-            document.getElementById('modal-ats-suggestions').textContent = job.atsSuggestions || 'None provided';
-        } else {
-            atsSection.style.display = 'none';
-        }
         
         // Populate skills
         this.populateSkills(job);
@@ -425,8 +410,7 @@ class JobBrowser {
         const headers = [
             'Title', 'Company', 'When Posted', 'Total Applicants', 'Job Type',
             'Apply Link', 'LinkedIn Job URL', 'Primary Skills', 'Secondary Skills',
-            'Tertiary Skills', 'Skill Score', 'ATS Score', 'ATS Matches', 'ATS Missing',
-            'ATS Suggestions', 'Description', 'Timestamp'
+            'Tertiary Skills', 'Skill Score', 'Description', 'Timestamp'
         ];
         
         const csvContent = [
@@ -443,10 +427,6 @@ class JobBrowser {
                 this.escapeCsv(job.secondarySkills || ''),
                 this.escapeCsv(job.tertiarySkills || ''),
                 job.skillScore || 0,
-                job.atsScore || '',
-                this.escapeCsv(job.atsMatches || ''),
-                this.escapeCsv(job.atsMissing || ''),
-                this.escapeCsv(job.atsSuggestions || ''),
                 this.escapeCsv((job.description || '').substring(0, 500) + '...'),
                 this.escapeCsv(job.timestamp || '')
             ].join(','))
@@ -512,6 +492,70 @@ class JobBrowser {
             .replace(/\n/g, '<br>');
     }
 
+    openATSAnalyzer() {
+        // Save current jobs to localStorage for the ATS analyzer to access
+        try {
+            localStorage.setItem('linkedinJobs', JSON.stringify(this.jobs));
+            
+            // Open ATS analyzer in new tab
+            const atsUrl = chrome.runtime.getURL('ats.html');
+            chrome.tabs.create({ url: atsUrl });
+            
+            this.showToast('Opening ATS Resume Analyzer...', 'info');
+        } catch (error) {
+            console.error('Error opening ATS analyzer:', error);
+            this.showToast('Failed to open ATS analyzer', 'error');
+        }
+    }
+
+    async clearAll() {
+        if (this.jobs.length === 0) {
+            this.showToast('No jobs to clear', 'warning');
+            return;
+        }
+
+        // Show confirmation dialog
+        const confirmed = confirm(
+            `Are you sure you want to delete all ${this.jobs.length} scraped jobs?\n\n` +
+            'This action cannot be undone.'
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        const clearBtn = document.getElementById('clear-all-btn');
+        const originalText = clearBtn.innerHTML;
+        
+        clearBtn.innerHTML = '🗑️ Clearing...';
+        clearBtn.disabled = true;
+
+        try {
+            // Clear from Chrome storage
+            await chrome.storage.local.clear();
+            
+            // Clear from localStorage as fallback
+            localStorage.removeItem('scrapedJobs');
+            
+            // Reset local data
+            this.jobs = [];
+            this.filteredJobs = [];
+            this.currentPage = 1;
+            
+            // Update UI
+            this.renderJobs();
+            this.updateStats();
+            
+            this.showToast('All jobs successfully deleted', 'success');
+        } catch (error) {
+            console.error('Error clearing jobs:', error);
+            this.showToast('Failed to clear jobs', 'error');
+        } finally {
+            clearBtn.innerHTML = originalText;
+            clearBtn.disabled = false;
+        }
+    }
+
     showToast(message, type = 'info') {
         // Create toast element
         const toast = document.createElement('div');
@@ -519,7 +563,7 @@ class JobBrowser {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
             color: white;
             padding: 12px 20px;
             border-radius: 8px;

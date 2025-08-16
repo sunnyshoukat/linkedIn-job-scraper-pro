@@ -166,15 +166,23 @@
             overflow: hidden;
         }
 
+        .btn-danger {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 2px solid #fecaca;
+        }
+
+        .btn-danger:hover {
+            background: #fecaca;
+            color: #991b1b;
+        }
+
         .job-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             border-color: #667eea;
         }
 
-        .job-card.has-ats {
-            border-left: 4px solid #10b981;
-        }
 
         .job-title {
             font-size: 1.3rem;
@@ -221,17 +229,6 @@
             font-weight: 500;
         }
 
-        .ats-badge {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: #10b981;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            font-weight: 600;
-        }
 
         .no-jobs {
             text-align: center;
@@ -391,28 +388,6 @@
             font-weight: 600;
         }
 
-        .ats-section {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            border: none;
-        }
-
-        .ats-section h4 {
-            color: white;
-            margin-bottom: 15px;
-        }
-
-        .ats-score {
-            font-size: 2rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-
-        .ats-details {
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
 
         .actions-bar {
             display: flex;
@@ -489,8 +464,8 @@
                     <span class="stat-label">Total Jobs</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-number" id="with-ats">0</span>
-                    <span class="stat-label">With ATS Scores</span>
+                    <span class="stat-number" id="with-scores">0</span>
+                    <span class="stat-label">With Skill Scores</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-number" id="avg-score">0</span>
@@ -515,7 +490,6 @@
                     <select class="filter-select" id="sort-filter">
                         <option value="recent">Most Recent</option>
                         <option value="skill-score">Highest Skill Score</option>
-                        <option value="ats-score">Highest ATS Score</option>
                         <option value="applicants-asc">Fewest Applicants</option>
                         <option value="applicants-desc">Most Applicants</option>
                     </select>
@@ -524,6 +498,9 @@
                     </button>
                     <button class="btn btn-primary" id="download-all-btn">
                         📥 Download All
+                    </button>
+                    <button class="btn btn-danger" id="clear-all-btn">
+                        🗑️ Clear All
                     </button>
                 </div>
             </div>
@@ -584,24 +561,6 @@
                             </div>
                         </div>
 
-                        <div class="sidebar-section" id="ats-sidebar" style="display: none;">
-                            <h4>🤖 ATS Analysis</h4>
-                            <div class="ats-score" id="modal-ats-score"></div>
-                            <div class="ats-details">
-                                <div style="margin-bottom: 10px;">
-                                    <strong>Matches:</strong>
-                                    <div id="modal-ats-matches"></div>
-                                </div>
-                                <div style="margin-bottom: 10px;">
-                                    <strong>Missing:</strong>
-                                    <div id="modal-ats-missing"></div>
-                                </div>
-                                <div>
-                                    <strong>Suggestions:</strong>
-                                    <div id="modal-ats-suggestions"></div>
-                                </div>
-                            </div>
-                        </div>
 
                         <div class="sidebar-section">
                             <h4>🎯 Skills Match</h4>
