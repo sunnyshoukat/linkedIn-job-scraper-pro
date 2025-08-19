@@ -3,7 +3,7 @@ console.log("LinkedIn Job Scraper Pro loaded");
 // Either import it or include it via manifest.json
 
 // Usage example:
-const { matchKeywords, extractMissingSkills, calculateSkillScore } = window.KeywordHelper || {};
+const { matchKeywords, getMissingSkillsWithDetails, calculateSkillScore } = window.KeywordHelper || {};
 const {
   hasLanguageRequirements,
   checkWorkLocationPreference,
@@ -578,6 +578,24 @@ async function extractJobData(card) {
       scrapingSettings.skillLevels,
       scrapingSettings.skillWeights
     );
+
+    // NEW: Enhanced skill analysis using getMissingSkillsWithDetails
+    let enhancedSkillAnalysis = null;
+    if (getMissingSkillsWithDetails) {
+      try {
+        enhancedSkillAnalysis = getMissingSkillsWithDetails(
+          searchText,
+          scrapingSettings.keywords,
+          {
+            returnDetails: true,
+            maxResults: 10
+          }
+        );
+        console.log(`Enhanced skill analysis for ${title}:`, enhancedSkillAnalysis);
+      } catch (error) {
+        console.warn("Enhanced skill analysis failed:", error);
+      }
+    }
 
     // NEW: Language and location checks
     const hasLangRequirements = hasLanguageRequirements(searchText);

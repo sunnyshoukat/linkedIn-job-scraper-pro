@@ -21,11 +21,14 @@ class JobBrowser {
         document.getElementById('search-input').addEventListener('input', 
             this.debounce(this.handleSearch.bind(this), 300));
         document.getElementById('job-type-filter').addEventListener('change', this.applyFilters.bind(this));
+        document.getElementById('status-filter').addEventListener('change', this.applyFilters.bind(this));
         document.getElementById('sort-filter').addEventListener('change', this.applyFilters.bind(this));
         
         // Button events
         document.getElementById('refresh-btn').addEventListener('click', this.refresh.bind(this));
         document.getElementById('download-all-btn').addEventListener('click', this.downloadAll.bind(this));
+        document.getElementById('upload-csv-btn').addEventListener('click', this.triggerCsvUpload.bind(this));
+        document.getElementById('csv-upload-input').addEventListener('change', this.handleCsvUpload.bind(this));
         document.getElementById('clear-all-btn').addEventListener('click', this.clearAll.bind(this));
         
         // Modal events
@@ -93,6 +96,7 @@ class JobBrowser {
     applyFilters() {
         const searchTerm = document.getElementById('search-input').value.toLowerCase();
         const jobTypeFilter = document.getElementById('job-type-filter').value;
+        const statusFilter = document.getElementById('status-filter').value;
         const sortBy = document.getElementById('sort-filter').value;
         
         // Filter jobs
@@ -106,7 +110,11 @@ class JobBrowser {
                 
             const matchesJobType = !jobTypeFilter || job.jobType === jobTypeFilter;
             
-            return matchesSearch && matchesJobType;
+            const matchesStatus = !statusFilter || 
+                (statusFilter === 'applied' && job.status === 'applied') ||
+                (statusFilter === 'not-applied' && job.status !== 'applied');
+            
+            return matchesSearch && matchesJobType && matchesStatus;
         });
         
         // Sort jobs
@@ -159,15 +167,48 @@ class JobBrowser {
             card.addEventListener('click', () => this.openJobModal(pageJobs[index]));
         });
         
+        // Add event listeners for action buttons
+        jobsGrid.querySelectorAll('.action-btn[data-action]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent opening modal
+                
+                // Get the button element (in case user clicked on text content)
+                const buttonElement = e.currentTarget;
+                const action = buttonElement.getAttribute('data-action');
+                const jobId = buttonElement.getAttribute('data-job-id');
+                
+                if (action === 'mark-applied') {
+                    this.markAsApplied(jobId, e);
+                } else if (action === 'remove') {
+                    this.removeJob(jobId, e);
+                }
+            });
+        });
+        
         this.updatePagination();
     }
 
     createJobCard(job) {
         const primarySkills = job.primarySkills ? job.primarySkills.split(', ').slice(0, 3) : [];
         const postedDate = this.formatDate(job.whenPosted);
+        const isApplied = job.status === 'applied';
+        const cardId = this.generateJobId(job);
         
         return `
-            <div class="job-card" data-job-id="${job.linkedinJobUrl}">
+            <div class="job-card ${isApplied ? 'applied' : ''}" data-job-id="${cardId}" data-card-index="${cardId}">
+                <div class="job-actions">
+                    ${!isApplied ? 
+                        `<button class="action-btn btn-apply" data-action="mark-applied" data-job-id="${cardId}" title="Mark as Applied">
+                            ✓
+                        </button>` : 
+                        `<button class="action-btn btn-applied" title="Already Applied">
+                            ✓
+                        </button>`
+                    }
+                    <button class="action-btn btn-remove" data-action="remove" data-job-id="${cardId}" title="Remove Job">
+                        ×
+                    </button>
+                </div>
                 
                 <div class="job-title">${this.escapeHtml(job.title || 'Unknown Title')}</div>
                 <div class="job-company">${this.escapeHtml(job.company || 'Unknown Company')}</div>
@@ -214,7 +255,7 @@ class JobBrowser {
         
         // Previous button
         paginationHTML += `
-            <button ${this.currentPage === 1 ? 'disabled' : ''} onclick="jobBrowser.goToPage(${this.currentPage - 1})">
+            <button ${this.currentPage === 1 ? 'disabled' : ''} data-page="${this.currentPage - 1}">
                 ← Previous
             </button>
         `;
@@ -224,7 +265,7 @@ class JobBrowser {
         const endPage = Math.min(totalPages, this.currentPage + 2);
         
         if (startPage > 1) {
-            paginationHTML += `<button onclick="jobBrowser.goToPage(1)">1</button>`;
+            paginationHTML += `<button data-page="1">1</button>`;
             if (startPage > 2) {
                 paginationHTML += `<span>...</span>`;
             }
@@ -233,7 +274,7 @@ class JobBrowser {
         for (let i = startPage; i <= endPage; i++) {
             paginationHTML += `
                 <button class="${i === this.currentPage ? 'current-page' : ''}" 
-                        onclick="jobBrowser.goToPage(${i})">
+                        data-page="${i}">
                     ${i}
                 </button>
             `;
@@ -243,18 +284,30 @@ class JobBrowser {
             if (endPage < totalPages - 1) {
                 paginationHTML += `<span>...</span>`;
             }
-            paginationHTML += `<button onclick="jobBrowser.goToPage(${totalPages})">${totalPages}</button>`;
+            paginationHTML += `<button data-page="${totalPages}">${totalPages}</button>`;
         }
         
         // Next button
         paginationHTML += `
             <button ${this.currentPage === totalPages ? 'disabled' : ''} 
-                    onclick="jobBrowser.goToPage(${this.currentPage + 1})">
+                    data-page="${this.currentPage + 1}">
                 Next →
             </button>
         `;
         
         pagination.innerHTML = paginationHTML;
+        
+        // Add event listeners to pagination buttons
+        pagination.querySelectorAll('button[data-page]').forEach(button => {
+            if (!button.disabled) {
+                button.addEventListener('click', (e) => {
+                    const pageNum = parseInt(e.currentTarget.getAttribute('data-page'));
+                    if (pageNum && pageNum >= 1 && pageNum <= totalPages) {
+                        this.goToPage(pageNum);
+                    }
+                });
+            }
+        });
     }
 
     goToPage(pageNumber) {
@@ -427,7 +480,7 @@ class JobBrowser {
                 this.escapeCsv(job.secondarySkills || ''),
                 this.escapeCsv(job.tertiarySkills || ''),
                 job.skillScore || 0,
-                this.escapeCsv((job.description || '').substring(0, 500) + '...'),
+                this.escapeCsv((job.description || '')),
                 this.escapeCsv(job.timestamp || '')
             ].join(','))
         ].join('\n');
@@ -583,6 +636,352 @@ class JobBrowser {
             toast.style.animation = 'slideIn 0.3s ease-out reverse';
             setTimeout(() => toast.remove(), 300);
         }, 3000);
+    }
+
+    // Job management methods
+    generateJobId(job) {
+        // Generate a unique ID based on job URL or create a hash from job details
+        if (job.linkedinJobUrl) {
+            return job.linkedinJobUrl.replace(/[^a-zA-Z0-9]/g, '_');
+        }
+        // Fallback: create hash from title + company
+        const uniqueString = `${job.title || ''}_${job.company || ''}_${job.timestamp || Date.now()}`;
+        return uniqueString.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
+    }
+
+    async markAsApplied(jobId, event) {
+        event.stopPropagation(); // Prevent opening modal
+        
+        try {
+            // Find the job in our data
+            const jobIndex = this.jobs.findIndex(job => this.generateJobId(job) === jobId);
+            if (jobIndex === -1) {
+                this.showToast('Job not found', 'error');
+                return;
+            }
+            
+            // Update job status
+            this.jobs[jobIndex].status = 'applied';
+            this.jobs[jobIndex].appliedDate = new Date().toISOString();
+            
+            // Save to storage
+            await chrome.storage.local.set({ jobDescriptions: this.jobs });
+            
+            // Update filtered jobs if needed
+            const filteredIndex = this.filteredJobs.findIndex(job => this.generateJobId(job) === jobId);
+            if (filteredIndex !== -1) {
+                this.filteredJobs[filteredIndex].status = 'applied';
+                this.filteredJobs[filteredIndex].appliedDate = new Date().toISOString();
+            }
+            
+            // Re-render to update the UI
+            this.renderJobs();
+            this.updateStats();
+            
+            this.showToast('Job marked as applied!', 'success');
+        } catch (error) {
+            console.error('Error marking job as applied:', error);
+            this.showToast('Failed to mark job as applied', 'error');
+        }
+    }
+
+    async removeJob(jobId, event) {
+        event.stopPropagation(); // Prevent opening modal
+        
+        // Show confirmation dialog
+        const confirmed = confirm('Are you sure you want to remove this job?\n\nThis action cannot be undone.');
+        if (!confirmed) {
+            return;
+        }
+        
+        try {
+            // Find and remove the job from our data
+            const jobIndex = this.jobs.findIndex(job => this.generateJobId(job) === jobId);
+            if (jobIndex === -1) {
+                this.showToast('Job not found', 'error');
+                return;
+            }
+            
+            const removedJob = this.jobs[jobIndex];
+            this.jobs.splice(jobIndex, 1);
+            
+            // Update filtered jobs
+            const filteredIndex = this.filteredJobs.findIndex(job => this.generateJobId(job) === jobId);
+            if (filteredIndex !== -1) {
+                this.filteredJobs.splice(filteredIndex, 1);
+            }
+            
+            // Save to storage
+            await chrome.storage.local.set({ jobDescriptions: this.jobs });
+            
+            // Re-render to update the UI
+            this.renderJobs();
+            this.updateStats();
+            
+            this.showToast(`Removed job: ${removedJob.title}`, 'success');
+        } catch (error) {
+            console.error('Error removing job:', error);
+            this.showToast('Failed to remove job', 'error');
+        }
+    }
+
+    // CSV Upload functionality
+    triggerCsvUpload() {
+        const input = document.getElementById('csv-upload-input');
+        input.click();
+    }
+
+    async handleCsvUpload(event) {
+        const file = event.target.files[0];
+        if (!file) {
+            return;
+        }
+
+        // Validate file type
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            this.showToast('Please select a valid CSV file', 'error');
+            return;
+        }
+
+        // Validate file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            this.showToast('File size too large. Maximum 10MB allowed.', 'error');
+            return;
+        }
+
+        const uploadBtn = document.getElementById('upload-csv-btn');
+        const originalText = uploadBtn.innerHTML;
+        
+        uploadBtn.innerHTML = '📤 Uploading...';
+        uploadBtn.disabled = true;
+
+        try {
+            const csvText = await this.readFileAsText(file);
+            const parsedJobs = await this.parseCsvData(csvText);
+            
+            if (parsedJobs.length === 0) {
+                this.showToast('No valid jobs found in CSV file', 'warning');
+                return;
+            }
+
+            await this.importJobs(parsedJobs);
+            
+        } catch (error) {
+            console.error('Error uploading CSV:', error);
+            this.showToast('Failed to upload CSV: ' + error.message, 'error');
+        } finally {
+            uploadBtn.innerHTML = originalText;
+            uploadBtn.disabled = false;
+            // Clear the input
+            event.target.value = '';
+        }
+    }
+
+    readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('Failed to read file'));
+            reader.readAsText(file);
+        });
+    }
+
+    parseCsvData(csvText) {
+        try {
+            const lines = csvText.trim().split('\n');
+            
+            if (lines.length < 2) {
+                throw new Error('CSV file must contain at least a header and one data row');
+            }
+
+            // Parse header row
+            const headers = this.parseCsvRow(lines[0]);
+            
+            // Map common column variations to standard field names
+            const fieldMapping = this.createFieldMapping(headers);
+            
+            if (!fieldMapping.title && !fieldMapping.company) {
+                throw new Error('CSV must contain at least Title or Company columns');
+            }
+
+            const jobs = [];
+            const errors = [];
+
+            // Parse data rows
+            for (let i = 1; i < lines.length; i++) {
+                try {
+                    const row = this.parseCsvRow(lines[i]);
+                    
+                    if (row.length === 0 || row.every(cell => !cell.trim())) {
+                        continue; // Skip empty rows
+                    }
+
+                    const job = this.mapCsvRowToJob(row, fieldMapping, headers);
+                    
+                    if (job && (job.title || job.company)) {
+                        jobs.push(job);
+                    }
+                } catch (error) {
+                    errors.push(`Row ${i + 1}: ${error.message}`);
+                }
+            }
+
+            if (errors.length > 0) {
+                console.warn('CSV parsing errors:', errors);
+            }
+
+            return jobs;
+        } catch (error) {
+            throw new Error(`CSV parsing failed: ${error.message}`);
+        }
+    }
+
+    parseCsvRow(row) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < row.length; i++) {
+            const char = row[i];
+            const nextChar = row[i + 1];
+            
+            if (char === '"') {
+                if (inQuotes && nextChar === '"') {
+                    // Escaped quote
+                    current += '"';
+                    i++; // Skip next quote
+                } else {
+                    // Toggle quote state
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
+                // End of field
+                result.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        
+        // Add the last field
+        result.push(current.trim());
+        
+        return result;
+    }
+
+    createFieldMapping(headers) {
+        const mapping = {};
+        
+        const fieldMappings = {
+            title: ['title', 'job title', 'position', 'role', 'job_title', 'job name'],
+            company: ['company', 'employer', 'organization', 'company name', 'company_name'],
+            description: ['description', 'job description', 'details', 'job_description', 'summary'],
+            jobType: ['job type', 'type', 'application type', 'job_type', 'apply_type'],
+            linkedinJobUrl: ['linkedin url', 'url', 'job url', 'link', 'linkedin_url', 'job_url'],
+            jobLink: ['apply link', 'application link', 'job link', 'apply_link', 'application_url'],
+            whenPosted: ['posted date', 'date posted', 'when posted', 'posted', 'date', 'posted_date'],
+            totalClick: ['applicants', 'total applicants', 'clicks', 'applications', 'total_click'],
+            skillScore: ['skill score', 'score', 'match score', 'skills', 'skill_score'],
+            primarySkills: ['primary skills', 'skills', 'key skills', 'primary_skills'],
+            secondarySkills: ['secondary skills', 'additional skills', 'secondary_skills'],
+            tertiarySkills: ['tertiary skills', 'other skills', 'tertiary_skills'],
+            status: ['status', 'application status', 'applied', 'job_status']
+        };
+        
+        headers.forEach((header, index) => {
+            const normalizedHeader = header.toLowerCase().trim();
+            
+            for (const [field, variants] of Object.entries(fieldMappings)) {
+                if (variants.includes(normalizedHeader)) {
+                    mapping[field] = index;
+                    break;
+                }
+            }
+        });
+        
+        return mapping;
+    }
+
+    mapCsvRowToJob(row, fieldMapping, headers) {
+        const job = {
+            timestamp: new Date().toISOString(),
+            uploadedFromCsv: true
+        };
+        
+        // Map known fields
+        for (const [field, columnIndex] of Object.entries(fieldMapping)) {
+            if (columnIndex !== undefined && row[columnIndex] !== undefined) {
+                let value = row[columnIndex].trim();
+                
+                // Type conversions
+                if (field === 'totalClick' || field === 'skillScore') {
+                    const numValue = parseInt(value) || 0;
+                    job[field] = numValue;
+                } else if (field === 'status') {
+                    // Normalize status values
+                    const normalizedStatus = value.toLowerCase();
+                    if (normalizedStatus.includes('applied') || normalizedStatus === 'true' || normalizedStatus === '1') {
+                        job.status = 'applied';
+                        job.appliedDate = new Date().toISOString();
+                    }
+                } else if (value) {
+                    job[field] = value;
+                }
+            }
+        }
+        
+        // Ensure required fields have defaults
+        if (!job.title) job.title = 'Imported Job';
+        if (!job.company) job.company = 'Unknown Company';
+        if (!job.jobType) job.jobType = 'External Apply';
+        
+        return job;
+    }
+
+    async importJobs(newJobs) {
+        const existingIds = new Set(this.jobs.map(job => this.generateJobId(job)));
+        const duplicates = [];
+        const imported = [];
+        
+        newJobs.forEach(job => {
+            const jobId = this.generateJobId(job);
+            
+            if (existingIds.has(jobId)) {
+                duplicates.push(job);
+            } else {
+                imported.push(job);
+                existingIds.add(jobId);
+            }
+        });
+        
+        if (imported.length > 0) {
+            // Add imported jobs to the beginning of the list
+            this.jobs.unshift(...imported);
+            
+            // Save to storage
+            await chrome.storage.local.set({ jobDescriptions: this.jobs });
+            
+            // Update UI
+            this.filteredJobs = [...this.jobs];
+            this.currentPage = 1;
+            this.applyFilters();
+            this.updateStats();
+        }
+        
+        // Show results
+        let message = `Successfully imported ${imported.length} jobs`;
+        if (duplicates.length > 0) {
+            message += `. Skipped ${duplicates.length} duplicates`;
+        }
+        
+        this.showToast(message, imported.length > 0 ? 'success' : 'warning');
+        
+        // Log details for debugging
+        console.log('CSV Import Results:', {
+            imported: imported.length,
+            duplicates: duplicates.length,
+            total: this.jobs.length
+        });
     }
 }
 

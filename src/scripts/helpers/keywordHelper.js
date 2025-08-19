@@ -644,9 +644,154 @@
         vault: ["hashicorp vault", "vault"],
       },
 
-      // All other categories from the previous comprehensive database...
-      // (Testing, Mobile, Data Science, Architecture, etc. - truncated for brevity)
-      // The full database would be included in the actual implementation
+      // Testing - Comprehensive Coverage
+      testing: {
+        // Frameworks & Libraries
+        jest: ["jest", "testing framework"],
+        mocha: ["mocha"],
+        chai: ["chai"],
+        jasmine: ["jasmine"],
+        cypress: ["cypress", "e2e testing", "end-to-end testing"],
+        playwright: ["playwright", "browser testing"],
+        puppeteer: ["puppeteer"],
+        selenium: ["selenium", "webdriver"],
+        testinglibrary: [
+          "testing library",
+          "react testing library",
+          "vue testing library",
+        ],
+        storybook: ["storybook", "component testing"],
+        karma: ["karma"],
+        qunit: ["qunit"],
+        junit: ["junit"],
+        testng: ["testng"],
+        nunit: ["nunit"],
+        xunit: ["xunit"],
+        pytest: ["pytest"],
+        unittest: ["unittest"],
+        spock: ["spock"],
+        rspec: ["rspec"],
+        cucumber: ["cucumber", "gherkin"],
+        specflow: ["specflow"],
+
+        // Concepts & Methodologies
+        tdd: ["tdd", "test driven development", "test-driven"],
+        bdd: ["bdd", "behavior driven development", "behavior-driven"],
+        unittesting: ["unit testing", "unit tests"],
+        integrationtesting: ["integration testing", "integration tests"],
+        e2etesting: ["e2e testing", "end to end testing"],
+        performancetesting: ["performance testing", "load testing", "stress testing"],
+        securitytesting: ["security testing", "penetration testing", "pen testing"],
+        automation: ["test automation", "automated testing"],
+        mocking: ["mocking", "faking", "stubbing"],
+        contracttesting: ["contract testing", "pact"],
+        visualtesting: ["visual regression testing", "visual testing"],
+        accessibilitytesting: ["a11y testing", "accessibility testing"],
+      },
+
+      // Mobile Development - Comprehensive Coverage
+      mobile: {
+        // Platforms
+        ios: ["ios", "iphone", "ipad"],
+        android: ["android"],
+        crossplatform: ["cross-platform", "multi-platform"],
+
+        // Frameworks & Libraries
+        reactnative: ["react native", "react-native"],
+        flutter: ["flutter", "dart"],
+        swiftui: ["swiftui"],
+        uikit: ["uikit"],
+        kotlinmultiplatform: ["kotlin multiplatform", "kmp"],
+        xamarin: ["xamarin", "maui"],
+        ionic: ["ionic framework", "ionic"],
+        nativescript: ["nativescript"],
+        cordova: ["cordova", "phonegap"],
+        androidjetpack: ["android jetpack", "jetpack compose"],
+
+        // Tools & Concepts
+        xcode: ["xcode"],
+        androidstudio: ["android studio"],
+        fastlane: ["fastlane"],
+        appstore: ["app store connect", "apple app store"],
+        googleplay: ["google play console", "google play"],
+        mobilecicd: ["mobile ci/cd", "codemagic", "bitrise"],
+        pushnotifications: ["push notifications", "apns", "fcm"],
+      },
+
+      // Data Science & Machine Learning - Comprehensive Coverage
+      data: {
+        // Libraries & Frameworks
+        tensorflow: ["tensorflow", "tf"],
+        pytorch: ["pytorch", "torch"],
+        keras: ["keras"],
+        scikitlearn: ["scikit-learn", "sklearn"],
+        pandas: ["pandas"],
+        numpy: ["numpy"],
+        scipy: ["scipy"],
+        matplotlib: ["matplotlib"],
+        seaborn: ["seaborn"],
+        plotly: ["plotly", "dash"],
+        opencv: ["opencv", "computer vision"],
+        pyspark: ["pyspark", "apache spark"],
+        hadoop: ["hadoop", "mapreduce"],
+
+        // Concepts & Techniques
+        machinelearning: [
+          "machine learning",
+          "ml",
+          "statistical modeling",
+          "supervised learning",
+          "unsupervised learning",
+          "reinforcement learning",
+        ],
+        deeplearning: ["deep learning", "neural networks", "cnn", "rnn"],
+        nlp: ["natural language processing", "nlp", "text mining"],
+        computervision: ["computer vision", "image processing"],
+        datamining: ["data mining", "knowledge discovery"],
+        bigdata: ["big data", "large scale data"],
+        dataanalysis: ["data analysis", "exploratory data analysis", "eda"],
+        datavisualization: ["data visualization", "dataviz"],
+        featureengineering: ["feature engineering"],
+        modeldeployment: ["model deployment", "mlops"],
+        airflow: ["apache airflow", "airflow"],
+      },
+
+      // Architecture & Design Patterns - Comprehensive Coverage
+      architecture: {
+        // Architectural Patterns
+        microservices: ["microservices", "micro services", "distributed systems"],
+        monolith: ["monolithic", "monolith"],
+        serverless: ["serverless", "faas", "functions as a service"],
+        eventdriven: ["event-driven architecture", "eda"],
+        soa: ["service-oriented architecture", "soa"],
+        cqrs: ["cqrs", "command query responsibility segregation"],
+        eventsourcing: ["event sourcing"],
+        hexagonal: ["hexagonal architecture", "ports and adapters"],
+        clean: ["clean architecture"],
+
+        // Design Patterns
+        solid: ["solid principles", "solid"],
+        designpatterns: [
+          "design patterns",
+          "gang of four",
+          "gof",
+          "singleton",
+          "factory",
+          "observer",
+          "decorator",
+          "strategy",
+        ],
+        grpc: ["grpc", "remote procedure call"],
+        rest: ["rest", "restful", "representational state transfer"],
+
+        // System Design Concepts
+        scalability: ["scalability", "high availability", "ha"],
+        resilience: ["resilience", "fault tolerance"],
+        caching: ["caching", "cache"],
+        messagequeues: ["message queues", "message brokers"],
+        loadbalancing: ["load balancing"],
+        distributed: ["distributed computing", "distributed systems"],
+      },
 
       // Soft Skills & Methodologies
       soft: {
@@ -839,6 +984,290 @@
 
     return result;
   }
+
+  // ===================================================================
+  // SKILL METADATA DATABASE
+  // ===================================================================
+
+  const SkillMetadata = {
+    // Difficulty levels (1-5, where 5 is most difficult)
+    difficulty: {
+      // Programming Languages
+      javascript: 2,
+      typescript: 3,
+      python: 2,
+      java: 3,
+      cplusplus: 4,
+      rust: 5,
+      golang: 3,
+      csharp: 3,
+      swift: 3,
+      kotlin: 3,
+      
+      // Frontend
+      html: 1,
+      css: 2,
+      react: 3,
+      vue: 3,
+      angular: 4,
+      svelte: 3,
+      nextjs: 4,
+      
+      // Backend
+      nodejs: 3,
+      express: 2,
+      nestjs: 4,
+      django: 3,
+      flask: 2,
+      springboot: 4,
+      
+      // Databases
+      mysql: 2,
+      postgresql: 3,
+      mongodb: 2,
+      redis: 2,
+      
+      // Cloud & DevOps
+      aws: 4,
+      docker: 3,
+      kubernetes: 5,
+      terraform: 4,
+      
+      // Data Science
+      machinelearning: 5,
+      tensorflow: 5,
+      pytorch: 5,
+      pandas: 3,
+      
+      // Testing
+      jest: 2,
+      cypress: 3,
+      selenium: 4,
+      
+      // Mobile
+      reactnative: 4,
+      flutter: 4,
+      ios: 4,
+      android: 4,
+    },
+
+    // Learning time estimates in weeks
+    learningTime: {
+      // Programming Languages (to proficiency)
+      javascript: 8,
+      typescript: 4, // assuming JS knowledge
+      python: 6,
+      java: 10,
+      cplusplus: 12,
+      rust: 16,
+      golang: 8,
+      csharp: 10,
+      swift: 10,
+      kotlin: 8, // assuming Java knowledge
+      
+      // Frontend
+      html: 2,
+      css: 4,
+      react: 6,
+      vue: 5,
+      angular: 8,
+      svelte: 4,
+      nextjs: 3, // assuming React knowledge
+      
+      // Backend
+      nodejs: 4, // assuming JS knowledge
+      express: 2,
+      nestjs: 6,
+      django: 6,
+      flask: 3,
+      springboot: 8,
+      
+      // Databases
+      mysql: 4,
+      postgresql: 5,
+      mongodb: 3,
+      redis: 2,
+      
+      // Cloud & DevOps
+      aws: 12,
+      docker: 4,
+      kubernetes: 12,
+      terraform: 8,
+      
+      // Data Science
+      machinelearning: 20,
+      tensorflow: 16,
+      pytorch: 16,
+      pandas: 6,
+      
+      // Testing
+      jest: 3,
+      cypress: 4,
+      selenium: 6,
+      
+      // Mobile
+      reactnative: 8,
+      flutter: 10,
+      ios: 12,
+      android: 12,
+    },
+
+    // Market demand scores (1-10, where 10 is highest demand)
+    marketDemand: {
+      // Programming Languages
+      javascript: 10,
+      typescript: 9,
+      python: 10,
+      java: 8,
+      cplusplus: 6,
+      rust: 7,
+      golang: 8,
+      csharp: 7,
+      swift: 6,
+      kotlin: 7,
+      
+      // Frontend
+      html: 8,
+      css: 8,
+      react: 10,
+      vue: 7,
+      angular: 7,
+      svelte: 5,
+      nextjs: 9,
+      
+      // Backend
+      nodejs: 9,
+      express: 8,
+      nestjs: 6,
+      django: 7,
+      flask: 6,
+      springboot: 8,
+      
+      // Databases
+      mysql: 7,
+      postgresql: 8,
+      mongodb: 8,
+      redis: 7,
+      
+      // Cloud & DevOps
+      aws: 10,
+      docker: 9,
+      kubernetes: 9,
+      terraform: 8,
+      
+      // Data Science
+      machinelearning: 9,
+      tensorflow: 8,
+      pytorch: 8,
+      pandas: 8,
+      
+      // Testing
+      jest: 7,
+      cypress: 6,
+      selenium: 5,
+      
+      // Mobile
+      reactnative: 7,
+      flutter: 8,
+      ios: 6,
+      android: 7,
+    },
+
+    // Salary impact multipliers (how much this skill can increase salary)
+    salaryImpact: {
+      // Programming Languages
+      javascript: 1.2,
+      typescript: 1.3,
+      python: 1.3,
+      java: 1.2,
+      cplusplus: 1.4,
+      rust: 1.5,
+      golang: 1.4,
+      csharp: 1.2,
+      swift: 1.3,
+      kotlin: 1.3,
+      
+      // Frontend
+      html: 1.0,
+      css: 1.1,
+      react: 1.3,
+      vue: 1.2,
+      angular: 1.2,
+      svelte: 1.2,
+      nextjs: 1.3,
+      
+      // Backend
+      nodejs: 1.3,
+      express: 1.1,
+      nestjs: 1.2,
+      django: 1.2,
+      flask: 1.1,
+      springboot: 1.3,
+      
+      // Databases
+      mysql: 1.1,
+      postgresql: 1.2,
+      mongodb: 1.2,
+      redis: 1.2,
+      
+      // Cloud & DevOps
+      aws: 1.5,
+      docker: 1.3,
+      kubernetes: 1.6,
+      terraform: 1.4,
+      
+      // Data Science
+      machinelearning: 1.7,
+      tensorflow: 1.6,
+      pytorch: 1.6,
+      pandas: 1.3,
+      
+      // Testing
+      jest: 1.1,
+      cypress: 1.1,
+      selenium: 1.1,
+      
+      // Mobile
+      reactnative: 1.3,
+      flutter: 1.4,
+      ios: 1.3,
+      android: 1.3,
+    },
+
+    // Learning resources
+    resources: {
+      javascript: {
+        free: ["MDN Web Docs", "freeCodeCamp", "JavaScript.info"],
+        paid: ["Frontend Masters", "Pluralsight", "Udemy"],
+        books: ["Eloquent JavaScript", "You Don't Know JS"],
+        practice: ["LeetCode", "Codewars", "HackerRank"]
+      },
+      react: {
+        free: ["React Official Docs", "freeCodeCamp", "React Tutorial"],
+        paid: ["React Training", "Egghead.io", "Frontend Masters"],
+        books: ["Learning React", "React: Up & Running"],
+        practice: ["React Challenges", "Build Projects"]
+      },
+      python: {
+        free: ["Python.org Tutorial", "Real Python", "Automate the Boring Stuff"],
+        paid: ["Python Institute", "DataCamp", "Coursera"],
+        books: ["Python Crash Course", "Effective Python"],
+        practice: ["LeetCode", "Project Euler", "Kaggle"]
+      },
+      aws: {
+        free: ["AWS Free Tier", "AWS Training", "Cloud Academy"],
+        paid: ["A Cloud Guru", "Linux Academy", "Pluralsight"],
+        books: ["AWS Certified Solutions Architect"],
+        practice: ["AWS Labs", "Hands-on Projects"]
+      },
+      docker: {
+        free: ["Docker Docs", "Docker Getting Started", "Play with Docker"],
+        paid: ["Docker Desktop", "Pluralsight", "Linux Academy"],
+        books: ["Docker: Up & Running", "Docker in Action"],
+        practice: ["Docker Labs", "Containerize Projects"]
+      }
+    }
+  };
 
   // ===================================================================
   // EXTRACT MISSING SKILLS FUNCTION
@@ -1226,13 +1655,369 @@
     };
   }
 
-  // Expose to global scope
+  /**
+   * Enhanced missing skills analysis with detailed metadata
+   * @param {string} jobDescription - Job description text
+   * @param {Array} myKeywords - User's current skills
+   * @param {Object} options - Configuration options
+   * @returns {Object} Detailed skill analysis with metadata
+   */
+  function getMissingSkillsWithDetails(jobDescription, myKeywords, options = {}) {
+    const basicResult = extractMissingSkills(jobDescription, myKeywords, {
+      ...options,
+      returnDetails: true,
+    });
+
+    if (!basicResult.missingSkills) {
+      return basicResult;
+    }
+
+    // Enrich each skill with metadata
+    const enrichedSkills = basicResult.missingSkills.map((skill) => {
+      const skillName = skill.skill;
+      
+      return {
+        ...skill,
+        difficulty: SkillMetadata.difficulty[skillName] || 3,
+        learningTime: SkillMetadata.learningTime[skillName] || 8,
+        marketDemand: SkillMetadata.marketDemand[skillName] || 5,
+        salaryImpact: SkillMetadata.salaryImpact[skillName] || 1.1,
+        resources: SkillMetadata.resources[skillName] || {
+          free: ["Online tutorials", "Documentation"],
+          paid: ["Online courses", "Bootcamps"],
+          books: ["Technical books"],
+          practice: ["Practice projects"]
+        },
+        learningPath: generateLearningPath(skillName, myKeywords),
+        roiScore: calculateROI(skillName),
+      };
+    });
+
+    // Sort by ROI score (return on investment)
+    enrichedSkills.sort((a, b) => b.roiScore - a.roiScore);
+
+    return {
+      ...basicResult,
+      missingSkills: enrichedSkills,
+      learningPlan: generateLearningPlan(enrichedSkills),
+      timeEstimate: calculateTotalLearningTime(enrichedSkills),
+      strategicInsights: generateStrategicInsights(enrichedSkills, myKeywords),
+    };
+  }
+
+  /**
+   * Generate learning path for a specific skill
+   * @param {string} skillName - Name of the skill
+   * @param {Array} userSkills - User's current skills
+   * @returns {Array} Learning path steps
+   */
+  function generateLearningPath(skillName, userSkills) {
+    const paths = {
+      react: [
+        "Learn JavaScript fundamentals (if needed)",
+        "Understand ES6+ features",
+        "Learn JSX syntax",
+        "Master React components and props",
+        "Understand state and lifecycle",
+        "Learn React Hooks",
+        "Practice with routing (React Router)",
+        "Build a complete project"
+      ],
+      nodejs: [
+        "JavaScript fundamentals",
+        "Understand asynchronous programming",
+        "Learn Node.js runtime environment",
+        "Master npm and package management",
+        "Learn Express.js framework",
+        "Understand databases integration",
+        "Learn authentication and security",
+        "Build REST APIs"
+      ],
+      aws: [
+        "Understand cloud computing basics",
+        "Learn AWS core services (EC2, S3, RDS)",
+        "Master IAM and security",
+        "Learn networking (VPC, subnets)",
+        "Understand deployment strategies",
+        "Learn monitoring and logging",
+        "Practice with AWS CLI/SDKs",
+        "Prepare for AWS certification"
+      ],
+      docker: [
+        "Understand containerization concepts",
+        "Learn Docker basics and commands",
+        "Master Dockerfile creation",
+        "Understand Docker Compose",
+        "Learn container networking",
+        "Practice with multi-stage builds",
+        "Learn Docker security best practices",
+        "Integrate with CI/CD pipelines"
+      ]
+    };
+
+    return paths[skillName] || [
+      "Research skill fundamentals",
+      "Find quality learning resources",
+      "Start with basics and theory",
+      "Practice with hands-on exercises",
+      "Build projects to apply knowledge",
+      "Join communities and forums",
+      "Seek feedback and mentorship",
+      "Continue practicing and improving"
+    ];
+  }
+
+  /**
+   * Calculate ROI score for a skill
+   * @param {string} skillName - Name of the skill
+   * @returns {number} ROI score
+   */
+  function calculateROI(skillName) {
+    const difficulty = SkillMetadata.difficulty[skillName] || 3;
+    const learningTime = SkillMetadata.learningTime[skillName] || 8;
+    const marketDemand = SkillMetadata.marketDemand[skillName] || 5;
+    const salaryImpact = SkillMetadata.salaryImpact[skillName] || 1.1;
+
+    // Calculate ROI: (marketDemand * salaryImpact) / (difficulty * learningTime)
+    // Normalize to 0-100 scale
+    const rawROI = (marketDemand * salaryImpact * 10) / (difficulty * Math.sqrt(learningTime));
+    return Math.min(100, Math.round(rawROI * 10));
+  }
+
+  /**
+   * Generate a comprehensive learning plan
+   * @param {Array} enrichedSkills - Skills with metadata
+   * @returns {Object} Learning plan
+   */
+  function generateLearningPlan(enrichedSkills) {
+    const plan = {
+      immediate: [], // High ROI, low learning time
+      shortTerm: [], // Medium ROI, medium learning time
+      longTerm: [], // High impact but high learning time
+      optional: [] // Low priority skills
+    };
+
+    enrichedSkills.forEach(skill => {
+      const { learningTime, roiScore, marketDemand, difficulty } = skill;
+      
+      if (roiScore >= 70 && learningTime <= 6) {
+        plan.immediate.push(skill);
+      } else if (roiScore >= 50 && learningTime <= 12) {
+        plan.shortTerm.push(skill);
+      } else if (marketDemand >= 7 || roiScore >= 60) {
+        plan.longTerm.push(skill);
+      } else {
+        plan.optional.push(skill);
+      }
+    });
+
+    return {
+      ...plan,
+      timeline: {
+        immediate: "1-6 weeks",
+        shortTerm: "2-3 months",
+        longTerm: "6+ months",
+        optional: "As time permits"
+      }
+    };
+  }
+
+  /**
+   * Calculate total learning time estimate
+   * @param {Array} enrichedSkills - Skills with metadata
+   * @returns {Object} Time estimates
+   */
+  function calculateTotalLearningTime(enrichedSkills) {
+    const totalWeeks = enrichedSkills.reduce((sum, skill) => sum + skill.learningTime, 0);
+    const averageWeeksPerSkill = totalWeeks / enrichedSkills.length;
+    
+    return {
+      totalWeeks,
+      totalMonths: Math.round(totalWeeks / 4.3),
+      averageWeeksPerSkill: Math.round(averageWeeksPerSkill),
+      parallelLearning: Math.ceil(totalWeeks / 2), // Assuming 2 skills at once
+      focusedLearning: totalWeeks
+    };
+  }
+
+  /**
+   * Generate strategic insights for skill development
+   * @param {Array} enrichedSkills - Skills with metadata
+   * @param {Array} userSkills - User's current skills
+   * @returns {Object} Strategic insights
+   */
+  function generateStrategicInsights(enrichedSkills, userSkills) {
+    const insights = {
+      quickWins: [],
+      careerAdvancement: [],
+      marketTrends: [],
+      skillCombinations: [],
+      certificationPaths: []
+    };
+
+    // Quick wins: High ROI, low difficulty, short learning time
+    insights.quickWins = enrichedSkills
+      .filter(skill => skill.roiScore >= 60 && skill.difficulty <= 3 && skill.learningTime <= 6)
+      .slice(0, 3)
+      .map(skill => ({
+        skill: skill.skill,
+        reason: `High market demand (${skill.marketDemand}/10) with relatively easy learning curve`,
+        timeInvestment: `${skill.learningTime} weeks`,
+        expectedROI: `${skill.roiScore}/100`
+      }));
+
+    // Career advancement: High salary impact skills
+    insights.careerAdvancement = enrichedSkills
+      .filter(skill => skill.salaryImpact >= 1.3)
+      .slice(0, 3)
+      .map(skill => ({
+        skill: skill.skill,
+        reason: `Significant salary impact (+${Math.round((skill.salaryImpact - 1) * 100)}%)`,
+        category: skill.category,
+        marketDemand: skill.marketDemand
+      }));
+
+    // Market trends: High demand skills
+    insights.marketTrends = enrichedSkills
+      .filter(skill => skill.marketDemand >= 8)
+      .slice(0, 5)
+      .map(skill => ({
+        skill: skill.skill,
+        demandLevel: skill.marketDemand,
+        category: skill.category,
+        trend: "Increasing"
+      }));
+
+    // Skill combinations that work well together
+    insights.skillCombinations = [
+      {
+        combination: ["react", "nodejs", "mongodb"],
+        name: "Full-Stack JavaScript",
+        strength: "Complete web development stack"
+      },
+      {
+        combination: ["aws", "docker", "kubernetes"],
+        name: "Cloud DevOps",
+        strength: "Modern cloud infrastructure management"
+      },
+      {
+        combination: ["python", "tensorflow", "pandas"],
+        name: "Data Science Stack",
+        strength: "Machine learning and data analysis"
+      }
+    ];
+
+    // Certification paths
+    insights.certificationPaths = [
+      {
+        provider: "AWS",
+        certifications: ["Solutions Architect Associate", "Developer Associate"],
+        relevantSkills: enrichedSkills.filter(s => s.category === "cloud" && s.skill.includes("aws"))
+      },
+      {
+        provider: "Google",
+        certifications: ["Professional Cloud Developer", "Professional Data Engineer"],
+        relevantSkills: enrichedSkills.filter(s => s.category === "cloud" || s.category === "data")
+      }
+    ];
+
+    return insights;
+  }
+
+  /**
+   * Prioritize skills based on multiple factors
+   * @param {Array} skills - List of skills to prioritize
+   * @param {Object} criteria - Prioritization criteria
+   * @returns {Array} Prioritized skills
+   */
+  function prioritizeSkills(skills, criteria = {}) {
+    const {
+      marketDemandWeight = 0.3,
+      salaryImpactWeight = 0.3,
+      learningTimeWeight = 0.2,
+      difficultyWeight = 0.2
+    } = criteria;
+
+    return skills.map(skill => {
+      const normalizedMarketDemand = skill.marketDemand / 10;
+      const normalizedSalaryImpact = Math.min(skill.salaryImpact / 2, 1);
+      const normalizedLearningTime = Math.max(0, 1 - skill.learningTime / 20);
+      const normalizedDifficulty = Math.max(0, 1 - skill.difficulty / 5);
+
+      const priorityScore = (
+        normalizedMarketDemand * marketDemandWeight +
+        normalizedSalaryImpact * salaryImpactWeight +
+        normalizedLearningTime * learningTimeWeight +
+        normalizedDifficulty * difficultyWeight
+      ) * 100;
+
+      return {
+        ...skill,
+        priorityScore: Math.round(priorityScore)
+      };
+    }).sort((a, b) => b.priorityScore - a.priorityScore);
+  }
+
+  /**
+   * Generate skill trend analysis
+   * @param {Array} skills - Skills to analyze
+   * @returns {Object} Trend analysis
+   */
+  function analyzeSkillTrends(skills) {
+    const trends = {
+      emerging: [],
+      growing: [],
+      stable: [],
+      declining: []
+    };
+
+    const emergingSkills = ["rust", "golang", "kubernetes", "tensorflow", "flutter"];
+    const growingSkills = ["react", "typescript", "aws", "docker", "python"];
+    const decliningSkills = ["angular", "jquery", "php", "perl"];
+
+    skills.forEach(skill => {
+      if (emergingSkills.includes(skill.skill)) {
+        trends.emerging.push({
+          ...skill,
+          trendReason: "Rapidly gaining adoption in the industry"
+        });
+      } else if (growingSkills.includes(skill.skill)) {
+        trends.growing.push({
+          ...skill,
+          trendReason: "Consistent growth in job market demand"
+        });
+      } else if (decliningSkills.includes(skill.skill)) {
+        trends.declining.push({
+          ...skill,
+          trendReason: "Decreasing market demand"
+        });
+      } else {
+        trends.stable.push({
+          ...skill,
+          trendReason: "Stable market demand"
+        });
+      }
+    });
+
+    return trends;
+  }
+
+  // Expose to global scope - ONLY ENHANCED FUNCTIONS
   global.KeywordHelper = {
+    // Keep for backward compatibility
     matchKeywords: matchKeywords,
-    extractMissingSkills: extractMissingSkills,
-    analyzeSkillGaps: analyzeSkillGaps,
-    generateRecommendations: generateRecommendations,
-    calculateSkillScore: calculateSkillScore
+    calculateSkillScore: calculateSkillScore,
+    
+    // MAIN ENHANCED FUNCTION - Use this exclusively
+    getMissingSkillsWithDetails: getMissingSkillsWithDetails,
+    
+    // COMMENTED OUT - Use getMissingSkillsWithDetails instead
+    // extractMissingSkills: extractMissingSkills,
+    // analyzeSkillGaps: analyzeSkillGaps,
+    // generateRecommendations: generateRecommendations,
+    // prioritizeSkills: prioritizeSkills,
+    // analyzeSkillTrends: analyzeSkillTrends,
+    // generateLearningPath: generateLearningPath
   };
 
   console.log("✅ KeywordHelper IIFE loaded successfully");
