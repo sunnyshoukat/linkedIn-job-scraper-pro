@@ -2,13 +2,70 @@ console.log("LinkedIn Job Scraper Pro loaded");
 // In your content.js, include the helper
 // Either import it or include it via manifest.json
 
-// Usage example:
-const { matchKeywords, getMissingSkillsWithDetails, calculateSkillScore } = window.KeywordHelper || {};
-const {
-  hasLanguageRequirements,
-  checkWorkLocationPreference,
-  hasVisaSponsorshipRequirement,
-} = window.LanguageAndLocationHelper || {};
+// Simple helper function access with fallbacks
+function getMatchKeywords() {
+  return window.KeywordHelper && window.KeywordHelper.matchKeywords || function(text, keywords) {
+    console.warn('matchKeywords not available, using fallback');
+    if (!text || !keywords) return [];
+    const normalizedText = text.toLowerCase();
+    return keywords.filter(k => normalizedText.includes(k.toLowerCase()));
+  };
+}
+
+function getCalculateSkillScore() {
+  return window.KeywordHelper && window.KeywordHelper.calculateSkillScore || function(text, skillLevels = {}, skillWeights = {}) {
+    console.warn('calculateSkillScore not available, using fallback');
+    let totalScore = 0;
+    const matchedSkills = { primary: [], secondary: [], tertiary: [] };
+    
+    for (const [level, skills] of Object.entries(skillLevels)) {
+      const weight = skillWeights[level] || 1;
+      for (const skill of skills || []) {
+        if (text.toLowerCase().includes(skill.toLowerCase())) {
+          matchedSkills[level].push(skill);
+          totalScore += weight;
+        }
+      }
+    }
+    
+    return {
+      totalScore,
+      matchedSkills,
+      primarySkillCount: matchedSkills.primary.length,
+      breakdown: `Primary: ${matchedSkills.primary.join(', ')} | Secondary: ${matchedSkills.secondary.join(', ')} | Tertiary: ${matchedSkills.tertiary.join(', ')}`
+    };
+  };
+}
+
+function getGetMissingSkillsWithDetails() {
+  return window.KeywordHelper && window.KeywordHelper.getMissingSkillsWithDetails || function() {
+    console.warn('getMissingSkillsWithDetails not available, using fallback');
+    return { missingSkills: [], totalFound: 0, totalMissing: 0 };
+  };
+}
+
+function getLanguageHelper(funcName) {
+  return window.LanguageAndLocationHelper && window.LanguageAndLocationHelper[funcName] || function() {
+    console.warn(`${funcName} not available, using fallback`);
+    return false;
+  };
+}
+
+// Debug function availability
+function checkHelperFunctions() {
+  console.log('🔍 Checking helper functions availability...');
+  console.log('KeywordHelper exists:', !!window.KeywordHelper);
+  console.log('LanguageAndLocationHelper exists:', !!window.LanguageAndLocationHelper);
+  
+  if (window.KeywordHelper) {
+    console.log('✅ KeywordHelper functions:', Object.keys(window.KeywordHelper));
+  } else {
+    console.warn('❌ KeywordHelper not loaded!');
+  }
+}
+
+// Call debug function after a short delay to allow scripts to load
+setTimeout(checkHelperFunctions, 1000);
 
 let isScrapingActive = false;
 let allJobData = [];
@@ -567,12 +624,14 @@ async function extractJobData(card) {
     const linkedinJobUrl = getCurrentLinkedInJobUrl();
     const { jobType, jobLink } = await determineJobTypeAndLink(linkedinJobUrl);
     const searchText = `${title} ${description}`;
+    const matchKeywords = getMatchKeywords();
     const matchedKeywords = matchKeywords(
       searchText,
       scrapingSettings.keywords
     );
 
     // NEW: Skill-based scoring
+    const calculateSkillScore = getCalculateSkillScore();
     const skillScore = calculateSkillScore(
       searchText,
       scrapingSettings.skillLevels,
@@ -580,24 +639,24 @@ async function extractJobData(card) {
     );
 
     // NEW: Enhanced skill analysis using getMissingSkillsWithDetails
-    let enhancedSkillAnalysis = null;
-    if (getMissingSkillsWithDetails) {
-      try {
-        enhancedSkillAnalysis = getMissingSkillsWithDetails(
-          searchText,
-          scrapingSettings.keywords,
-          {
-            returnDetails: true,
-            maxResults: 10
-          }
-        );
-        console.log(`Enhanced skill analysis for ${title}:`, enhancedSkillAnalysis);
-      } catch (error) {
-        console.warn("Enhanced skill analysis failed:", error);
+    const getMissingSkillsWithDetails = getGetMissingSkillsWithDetails();
+    let enhancedSkillAnalysis = getMissingSkillsWithDetails(
+      searchText,
+      scrapingSettings.keywords,
+      {
+        returnDetails: true,
+        maxResults: 10
       }
+    );
+    if (enhancedSkillAnalysis && enhancedSkillAnalysis.missingSkills && enhancedSkillAnalysis.missingSkills.length > 0) {
+      console.log(`Enhanced skill analysis for ${title}:`, enhancedSkillAnalysis);
     }
 
     // NEW: Language and location checks
+    const hasLanguageRequirements = getLanguageHelper('hasLanguageRequirements');
+    const checkWorkLocationPreference = getLanguageHelper('checkWorkLocationPreference');
+    const hasVisaSponsorshipRequirement = getLanguageHelper('hasVisaSponsorshipRequirement');
+    
     const hasLangRequirements = hasLanguageRequirements(searchText);
     const isRemoteFriendly = checkWorkLocationPreference(searchText, "remote");
     const isLocalOnly = checkWorkLocationPreference(searchText, "local");
